@@ -131,6 +131,7 @@ const genIsland=(type,shape,num,NS=128)=>{
  /* drop tiny road crumbs */
  {const lab=new Int32Array(NN).fill(-1);for(let i=0;i<NN;i++){if(!isR(i)||lab[i]>=0)continue;const q=[i],c=[i];lab[i]=i;while(q.length){const j=q.pop(),x=j%N,y=(j/N)|0;for(const [dx,dy] of D4){const k=id(x+dx,y+dy);if(In(x+dx,y+dy)&&isR(k)&&lab[k]<0){lab[k]=i;q.push(k);c.push(k);}}}if(c.length<8)for(const j of c)kind[j]=0;}}
  const nearR=i=>{const x=i%N,y=(i/N)|0;for(const [dx,dy] of D4){const k=id(x+dx,y+dy);if(In(x+dx,y+dy)&&isR(k)&&LVL[k]===LVL[i])return true;}return false;};
+ /* 횡단보도 끝 칸이 될 자리: 옆 도로 칸이 갈림길(세 갈래 이상) 바로 다음의 곧은 칸 — 소품을 두지 않는다 */const rdeg=(x,y)=>D4.reduce((n,[dx,dy])=>n+(In(x+dx,y+dy)&&isR(id(x+dx,y+dy))?1:0),0),nearCW=i=>{const x=i%N,y=(i/N)|0;for(const [dx,dy] of D4){const ax=x+dx,ay=y+dy;if(!In(ax,ay)||!isR(id(ax,ay))||rdeg(ax,ay)!==2)continue;if(D4.some(([ex,ey])=>In(ax+ex,ay+ey)&&isR(id(ax+ex,ay+ey))&&rdeg(ax+ex,ay+ey)>=3))return true;}return false;};
  /* 6. blocks: flood the tiles between roads */
  const blk=new Int32Array(NN).fill(-1),BL=[];for(let i=0;i<NN;i++){if(!land(i)||isR(i)||water(i)||blk[i]>=0)continue;const q=[i],c=[];blk[i]=BL.length;while(q.length){const j=q.pop();c.push(j);const x=j%N,y=(j/N)|0;for(const [dx,dy] of D4){const xx=x+dx,yy=y+dy;if(!In(xx,yy))continue;const k=id(xx,yy);if(land(k)&&!isR(k)&&!water(k)&&blk[k]<0){blk[k]=BL.length;q.push(k);}}}BL.push(c);}
  const pave=i=>{pv[i]=1+((fbm((i%N)/5,((i/N)|0)/5)*3)|0)%3;};
@@ -298,4 +299,6 @@ const genIsland=(type,shape,num,NS=128)=>{
  /* 논 사이엔 경사가 없다 — 논 칸의 경사는 없애 계단식 단으로(밭 경사는 밭흙 경사로 남긴다). 섬 가장자리 절벽에 바로 붙은 논은 풀 둔치로 */for(let i=0;i<NN;i++){if(sl[i]&&terr[i]===12&&!isR(i)&&pv[i]!==6)sl[i]=0;}
  for(let i=0;i<NN;i++){if(terr[i]!==12)continue;const x=i%N,y=(i/N)|0;let e=false;for(let a=-1;a<=1&&!e;a++)for(let b=-1;b<=1;b++){if(!In(x+b,y+a)||!land(id(x+b,y+a))){e=true;break;}}if(e){terr[i]=0;lvl[i]=0;}}
  if(shape==='sea'){/* 둥근 섬 테두리 안의 바다는 섬 위의 물(1단)로: 가장자리는 섬 밖으로 쏟아지는 폭포가 된다 */for(let y=3;y<N-3;y++)for(let x=3;x<N-3;x++){const i=id(x,y);if(!ocean[i])continue;if(Math.hypot(x-cx,y-cy)/(44*Sc)+(fbm(x/18/Sc+7,y/18/Sc)-.5)*.3>=1)continue;ocean[i]=0;terr[i]=TWA;LVL[i]=1;kind[i]=0;deco[i]=0;pv[i]=0;sl[i]=0;prop[i]=0;lvl[i]=0;}}
+ /* 벤치는 공원에만: 공원이 아니게 된 칸에 남은 벤치(1)는 치운다. 횡단보도 끝 칸에 놓인 원두막(30)·정류장(31)도 치운다.
+    (만드는 도중이 아니라 맨 끝에서 지운다 — 난수 순서가 그대로라 같은 씨앗의 섬 모양은 바뀌지 않는다) */for(let i=0;i<NN;i++){if(prop[i]===1&&kind[i]!==K.PARK)prop[i]=0;const t=(prop[i]&15)|((prop[i]>>7)<<4);if((t===30||t===31)&&nearCW(i))prop[i]=0;}
  return {N,HN,K,TWA,H:b64e(H),terr:b64e(terr),kind:b64e(kind),lvl:b64e(lvl),deco:b64e(deco),ocean:b64e(ocean),LVL:b64e(LVL),lmkA:b64e(new Uint8Array(lmkA.buffer)),pv:b64e(pv),sl:b64e(sl),prop:b64e(prop),big:BIGS,auto:type!=='farm'&&type!=='forest',hmin:0,hmax:FV?7:maxL};};
