@@ -24,7 +24,7 @@ if os.environ.get('ARMS'): Q['armLen'] = float(os.environ['ARMS'])
 if os.environ.get('EARYAW'): Q['earYaw'] = float(os.environ['EARYAW'])
 HEAD_BOT = 0.535
 EYE_Z, EYE_X = Q['eyeZ'], Q['eyeX']
-NOSE_Z, MOUTH_Z = Q['noseZ'], Q['mouthZ']
+NOSE_Z, MOUTH_Z = Q['noseZ'] + 0.012, Q['mouthZ']      # 코 +0.012: 헤어 01 기준 두상(float-hair/HANDOFF.md 4)
 EAR = (Q['earX'], Q['earY'], Q['earZ']); EAR_S = Q['earS']
 EAR_YAW = math.radians(Q['earYaw'])   # 귀를 세로축으로 돌린 각(0 = 머리 옆면과 나란히, 클수록 귀 면이 정면을 봄)
 SH = np.array([Q['shX'], 0.010, Q['shZ']])  # 어깨
@@ -87,11 +87,21 @@ def core_sdf(X, Y, Z):
     muzz = gauss(X, Z, 0.0, MOUTH_Z + 0.015, 0.140, 0.080)
     nose = gauss(X, Z, 0.0, NOSE_Z, 0.032, 0.030)
     head = head + fw * (Q['sockD'] * sock - Q['cheekH'] * cheek - Q['muzzH'] * muzz - Q['noseH'] * nose + Q['lipD'] * lip)
+    # ---- 헤어 01(v62)을 맞춘 두상 수정(float-hair/HANDOFF.md '두상 변경 기록' 1·3)
+    # 3. 눈썹뼈·콧대 음영: 눈자리는 조금 더 오목, 눈썹뼈·콧대는 볼록, 미간은 채워 음영이 지지 않게
+    sock2 = gauss(A, Z, EYE_X + 0.006, EYE_Z + 0.008, 0.086, 0.084)
+    brow = gauss(A, Z, EYE_X - 0.025, EYE_Z + 0.105, 0.115, 0.048)
+    glab = gauss(X, Z, 0.0, EYE_Z + 0.055, 0.075, 0.070)
+    zb = sstep(NOSE_Z, EYE_Z, Z)                                          # 인계서에 정의가 없어 '코에서 눈높이로 갈수록 1'로 둠(콧대가 위로 갈수록 넓어짐)
+    bridge = np.exp(-(X / (0.052 + 0.026 * zb)) ** 2) * sstep(NOSE_Z - 0.01, NOSE_Z + 0.03, Z) * sstep(EYE_Z + 0.03, EYE_Z - 0.04, Z)
+    head = head + 0.45 * fw * (0.020 * sock2 - 0.010 * brow - 0.010 * bridge - 0.010 * glab)
+    # 1. 뒤통수 하부~목덜미를 둥글게 들여 넣는다(뒷머리 밑단이 뜨지 않게)
+    head = head + 0.035 * sstep(-0.02, 0.30, Y) * sstep(0.98, 0.55, Z) ** 2
     return head
 
 def parts(X, Y, Z):
     """부위별 거리장. 좌우 대칭(|x|)"""
-    A = np.abs(X); P = {'_z': Z}; Yb = Y - Q['bodyY']                              # 몸은 머리 밑에서 앞뒤로 옮길 수 있음(bodyY)
+    A = np.abs(X); P = {'_z': Z, '_y': Y}; Yb = Y - Q['bodyY']                              # 몸은 머리 밑에서 앞뒤로 옮길 수 있음(bodyY)
     head = core_sdf(X, Y, Z)
     # 귀: 납작한 타원 + 안쪽 오목
     zl = Z - EAR[2]; es = EAR_S * (1 + 0.12 * np.clip(zl / (0.078 * EAR_S), -1, 1))                    # 위가 조금 넓고 아래는 턱선으로 흘러듦
@@ -131,7 +141,8 @@ def total(P):
     body = smin(P['torso'], low, 0.045)
     body = smin(body, P['arm'], P['_ka'])
     body = smin(body, P['neck'], 0.07)
-    return smax(smin(body, P['head'], 0.022), -Z_GROUND(P), 0.008)
+    kn = 0.022 + 0.06 * sstep(-0.06, 0.14, P['_y']) * sstep(0.82, 0.52, P['_z'])      # 2. 목 필렛: 뒤쪽 아래에서 머리와 몸이 더 완만하게 이어진다
+    return smax(smin(body, P['head'], kn), -Z_GROUND(P), 0.008)
 
 def sdf(X, Y, Z): return total(parts(X, Y, Z))
 

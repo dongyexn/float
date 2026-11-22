@@ -173,15 +173,24 @@ const heldDrop=cancel=>{const h=HELD;if(!h)return false;HELD=null;const o=h.o,x=
 const B15D=$('b15')?JSON.parse($('b15').textContent):null,B15S=.33,B15N=['thighL','thighR','shinL','shinR','upper_armL','upper_armR','forearmL','forearmR'],B15T={},B15M='b';let B15=null;
 /* 앉는 자세: 엉덩이를 등받이 쪽으로 물리고(back) 살짝 올려(up) 자리 위에 얹는다. 다리가 짧아 무릎을 꺾어 내리면 자리에 박히므로 앞으로 뻗고(th·sh), 손은 무릎 위(ua·fa) */
 const SIT={back:.06,up:.022,th:-1.45,sh:.25,ua:-.7,fa:-.5};
-const b15Load=k=>B15T[k]||(B15T[k]=(async()=>{const [{GLTFLoader},SU]=await Promise.all([import('three/addons/loaders/GLTFLoader.js'),import('three/addons/utils/SkeletonUtils.js')]);const g=await new GLTFLoader().parseAsync(b64d(B15D[k]).buffer,''),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,metalness:0});g.scene.traverse(m=>{if(m.isMesh){m.material=mat;m.frustumCulled=false;m.receiveShadow=true;m.userData.keep=1;}});return {g,clone:SU.clone};})());
+const b15Load=k=>B15T[k]||(B15T[k]=(async()=>{const [{GLTFLoader},SU]=await Promise.all([import('three/addons/loaders/GLTFLoader.js'),import('three/addons/utils/SkeletonUtils.js')]);const g=await new GLTFLoader().parseAsync(b64d(B15D[k]).buffer,''),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,metalness:0});g.scene.traverse(m=>{if(m.isMesh){m.material=mat;m.frustumCulled=false;m.receiveShadow=true;m.userData.keep=1;}});b15Hair(g.scene,mat);return {g,clone:SU.clone};})());
 const b15X=new THREE.Vector3(1,0,0),b15Q=new THREE.Quaternion();
+/* 헤어 01(머리카락 + 두피 캡): 몸 모델과 같은 좌표(Y 위, +z 정면, 축척 1)로 만든 데이터라 head 뼈의 바인드 역행렬만 곱해 그 뼈 밑에 붙인다 → 머리에 완전히 묶인 것처럼 따라 움직인다.
+   두 조각을 꼭짓점 색으로 한 메시에 합쳐 주민 한 명에 그리기 1번만 더한다. 음영은 매끈한 법선과 면 법선을 섞은 것(면 쪽 .55) */
+const b15Hair=(scene,mat)=>{const hd=B15D&&B15D.h;if(!hd)return;let skm=null;scene.traverse(m=>{if(m.isSkinnedMesh)skm=m;});if(!skm)return;const bi=skm.skeleton.bones.findIndex(b=>b.name==='head');if(bi<0)return;
+ const P=[],Nn=[],C=[],K=.55,col=new THREE.Color(),e1=new THREE.Vector3(),e2=new THREE.Vector3(),fn=new THREE.Vector3(),vn=new THREE.Vector3();
+ for(const [part,hex] of [['hair',hd.color.hair],['cap',hd.color.cap]]){const v=hd[part].v,f=hd[part].f,sm=new Float32Array(v.length),FN=[];col.set(hex);
+  for(let i=0;i<f.length;i+=3){const a=f[i]*3,b=f[i+1]*3,c=f[i+2]*3;e1.set(v[b]-v[a],v[b+1]-v[a+1],v[b+2]-v[a+2]);e2.set(v[c]-v[a],v[c+1]-v[a+1],v[c+2]-v[a+2]);fn.crossVectors(e1,e2);for(const k of [a,b,c]){sm[k]+=fn.x;sm[k+1]+=fn.y;sm[k+2]+=fn.z;}fn.normalize();FN.push(fn.x,fn.y,fn.z);}
+  for(let i=0;i<f.length;i+=3)for(let j=0;j<3;j++){const k=f[i+j]*3;P.push(v[k],v[k+1],v[k+2]);vn.set(sm[k],sm[k+1],sm[k+2]).normalize().multiplyScalar(1-K);vn.x+=FN[i]*K;vn.y+=FN[i+1]*K;vn.z+=FN[i+2]*K;vn.normalize();Nn.push(vn.x,vn.y,vn.z);C.push(col.r,col.g,col.b);}}
+ const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.Float32BufferAttribute(P,3));ge.setAttribute('normal',new THREE.Float32BufferAttribute(Nn,3));ge.setAttribute('color',new THREE.Float32BufferAttribute(C,3));
+ const m=new THREE.Mesh(ge,mat);m.name='hair01';m.matrix.multiplyMatrices(skm.skeleton.boneInverses[bi],skm.bindMatrix);m.matrixAutoUpdate=false;m.frustumCulled=false;m.receiveShadow=true;m.userData.keep=1;skm.skeleton.bones[bi].add(m);};
 const b15New=T=>{const g=T.clone(T.g.scene),B={};g.scale.setScalar(B15S);g.updateMatrixWorld(true);for(const n of B15N){const b=g.getObjectByName(n);b.getWorldQuaternion(b15Q);B[n]={b,q0:b.quaternion.clone(),ax:b15X.clone().applyQuaternion(b15Q.invert())};}g.userData.keep=1;return {g,B};};
 const b15T=(o,n,a)=>{const b=o.B[n];b.b.quaternion.copy(b.q0).multiply(b15Q.setFromAxisAngle(b.ax,a));};
 const b15Sit=(o,ua=SIT.ua,fa=SIT.fa)=>{b15T(o,'thighL',SIT.th);b15T(o,'thighR',SIT.th);b15T(o,'shinL',SIT.sh);b15T(o,'shinR',SIT.sh);b15T(o,'upper_armL',ua);b15T(o,'upper_armR',ua);b15T(o,'forearmL',fa);b15T(o,'forearmR',fa);};
 let B15TT=null;/* 불러 둔 모델(있으면 기다리지 않고 바로 쓴다) */
 const mkB15=async()=>{if(!B15D||!B15D[B15M]||!PPL)return;const my=PPL;let T=B15TT;if(!T){T=await b15Load(B15M).catch(e=>{console.warn('b15',e);return null;});if(!T||PPL!==my)return;B15TT=T;}
  /* 이어 쓰는 주민은 모델도 그대로 새 장면에 옮기고, 사라진 주민의 모델만 치운다 */const keep=new Set(PPL.P);if(B15)for(const o of B15.L)if(!keep.has(o.p)||o.p.b15!==o){o.g.removeFromParent();o.g.traverse(m=>{if(m.isSkinnedMesh)m.skeleton.dispose();});if(o.p.b15===o)o.p.b15=null;}
- const L=[];for(const p of PPL.P){let o=p.b15;if(!o){o=b15New(T);o.p=p;p.b15=o;}W.sc.add(o.g);L.push(o);}
+ const L=[];for(const p of PPL.P){let o=p.b15;if(!o){o=b15New(T);o.p=p;p.b15=o;if(p.monk){const h=o.g.getObjectByName('hair01');if(h)h.visible=false;/* 스님은 민머리 */}}W.sc.add(o.g);L.push(o);}
  B15={L};if(SELO&&SELO.t==='ppl')olMake(SELO);pplPose();need=true;};
 const b15Pose=()=>{if(!B15||!PPL)return;smTick();const on=V.k<=40;
  for(const o of B15.L){const p=o.p,st=p.sit>=0?SEATS[p.sit]:null,gone=p.hid||p.away>0,h=p.held?HELD:null;let vis=on&&!gone;
