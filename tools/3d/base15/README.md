@@ -10,6 +10,7 @@
 | `params.json` | 확정 치수 |
 | `base15.glb` | 게임용 모델: 스킨 메시 1개(약 2,700 삼각형), 얼굴은 꼭짓점 색으로 구움 |
 | `hair01_lite.json` | 헤어 01 데이터(프로젝트 문서 float-hair 참조) |
+| `faces15.py`, `faces15.json` | 얼굴 20종 생성기와 결과(머리 표면에 투영한 파츠, 꼭짓점 색) |
 | `mktest.py` | 시험판 빌드 |
 
 게임용 모델 다시 만들기(bpy, scikit-image 필요):
@@ -17,10 +18,11 @@
 ```
 cd tools/3d/base15
 PARAMS=params.json MESH=mesh.npz python3 chibi15.py
-PARAMS=params.json MESH=mesh.npz JOBS=gglb GNAME=base15 GTRI=2000 GFACE=0.3 OUTD=. python3 render15.py
+PARAMS=params.json MESH=mesh.npz JOBS=gglb GNAME=base15 GTRI=2000 GNOFACE=1 OUTD=. python3 render15.py
+PARAMS=params.json python3 faces15.py
 ```
 
-게임 쪽(`play_game.js`의 "주민" 구역): 모든 빌드에 이 모델을 싣는다(2026-11-22 결재로 기존 주민과 `ppl.json`은 삭제). 헤어는 `hair01_lite.json`(헤어 01: 머리카락 3000 + 두피 캡 1499 삼각형, 몸 모델과 같은 좌표)을 head 뼈 밑에 붙인다(`b15Hair`). 두상은 이 헤어에 맞춘 수정(목덜미 리세스·목 필렛·눈썹뼈/콧대 음영·코 +0.012)이 `chibi15.py`에 들어 있다. 옷은 아직 없다.
+게임 쪽(`play_game.js`의 "주민" 구역): 모든 빌드에 이 모델을 싣는다(2026-11-22 결재로 기존 주민과 `ppl.json`은 삭제). 헤어는 `hair01_lite.json`(헤어 01: 머리카락 3000 + 두피 캡 1499 삼각형, 몸 모델과 같은 좌표)을 head 뼈 밑에 붙인다(`b15Hair`). 두상은 이 헤어에 맞춘 수정(목덜미 리세스·목 필렛·눈썹뼈/콧대 음영·코 +0.012)이 `chibi15.py`에 들어 있다. 얼굴은 20종(A~T, `faces15.py` → `faces15.json`)을 주민마다 무작위로 붙이며, 그래서 `base15.glb`는 얼굴 없이 몸만 뽑는다(`GNOFACE=1`). 옷은 아직 없다.
 시험판: `python3 tools/3d/base15/mktest.py` → `build/float-resident-test.html`.
 
 좌표: x 좌우, -y 정면, z 위, 바닥 z=0, 머리 높이 ≈ 1. 게임에서는 배율 .33(기존 주민과 같은 키).

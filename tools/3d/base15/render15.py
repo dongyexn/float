@@ -249,6 +249,9 @@ if 'pose' in JOBS:
     reset()
 if 'gglb' in JOBS:      # 게임 시험용: 얼굴을 꼭짓점 색으로 구워 몸과 한 덩어리(스킨 메시 1개, 재질 1개)로 내보냄. GTRI = 몸 삼각형 수 목표, GFACE = 얼굴 파츠 감축 비율
     reset(); tgt = int(os.environ.get('GTRI', 0)); fr = float(os.environ.get('GFACE', 1.0))
+    if os.environ.get('GNOFACE'):                         # 얼굴 없이 몸만: 게임이 얼굴 20종(faces15.json)을 따로 붙인다
+        for o in FACE: bpy.data.objects.remove(o, do_unlink=True)
+        FACE[:] = []
     def paint(ob, rgb):
         ca = ob.data.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); ca.data.foreach_set('color', np.tile(np.array([*rgb, 1.0], np.float32), len(ob.data.vertices)))
     def dec(ob, ratio):
