@@ -1,0 +1,125 @@
+<title>얼굴 배치 도구</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{--bg:#eef1f5;--panel:#ffffffcc;--fg:#1d2330;--mut:#6b7385;--line:#d9dee7;--acc:#2f6fed;--accs:#e3ecff;--stage:#9fcf6a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171d;--panel:#1d212acc;--fg:#e8ebf1;--mut:#9aa2b3;--line:#2c323d;--acc:#6b9bff;--accs:#24304a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#14171d;--panel:#1d212acc;--fg:#e8ebf1;--mut:#9aa2b3;--line:#2c323d;--acc:#6b9bff;--accs:#24304a;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;padding-block:14px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1400px;margin:0 auto}
+@media (max-width:820px){.wrap{grid-template-columns:minmax(0,1fr)}.wrap .stage{aspect-ratio:1/1}}
+.stage{position:relative;border-radius:16px;overflow:hidden;background:var(--stage);aspect-ratio:16/10;min-height:0;touch-action:none}
+.stage canvas{display:block;width:100%;height:100%}
+.views{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:0;border-radius:999px;padding:6px 12px;background:#ffffffd9;color:#1d2330;font:inherit;font-size:13px;cursor:pointer}
+.chip[aria-pressed="true"]{background:#1d2330;color:#fff}
+.busy{position:absolute;right:12px;bottom:10px;font-size:12px;color:#1d2330;opacity:.7}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;color:var(--mut);font:inherit;padding:6px 0;border-radius:8px;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--fg);box-shadow:0 1px 2px #0002}
+h2{font-size:12px;letter-spacing:.04em;color:var(--mut);margin:4px 0 -4px;font-weight:600}
+.row{display:grid;grid-template-columns:72px minmax(0,1fr) 52px;align-items:center;gap:8px}
+.row label{white-space:nowrap}
+.row output{text-align:right;font-variant-numeric:tabular-nums;color:var(--mut);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.chk{display:flex;align-items:center;gap:8px;color:var(--mut)}
+.btns{display:flex;gap:8px}
+.btn{flex:1;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:10px;padding:8px 0;font:inherit;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+pre{margin:0;background:var(--bg);border-radius:10px;padding:10px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;user-select:all}
+</style>
+<div class="wrap">
+ <div class="stage" id="stage"><div class="views" id="views"></div><div class="busy" id="busy"></div></div>
+ <div class="panel">
+  <div class="seg" id="who"><button data-k="all" aria-pressed="true">남녀 같이</button><button data-k="U">여자 01</button><button data-k="V">남자 01</button></div>
+  <div class="seg" id="hair"><button data-h="0" aria-pressed="true">헤어 01</button><button data-h="1">헤어 02</button></div>
+  <h2>눈·눈썹</h2>
+  <div class="row"><label for="s_sz">크기</label><input id="s_sz" type="range" min="70" max="150" step="1"><output></output></div>
+  <div class="row"><label for="s_KE">간격</label><input id="s_KE" type="range" min="0.6" max="1.4" step="0.01"><output></output></div>
+  <div class="row"><label for="s_EY">높이</label><input id="s_EY" type="range" min="-0.5" max="0.5" step="0.01"><output></output></div>
+  <h2>입</h2>
+  <div class="row"><label for="s_MZ">높이</label><input id="s_MZ" type="range" min="0.58" max="0.82" step="0.005"><output></output></div>
+  <h2>볼터치</h2>
+  <div class="row"><label for="s_KB">가로</label><input id="s_KB" type="range" min="0.7" max="1.6" step="0.01"><output></output></div>
+  <div class="row"><label for="s_DB">눈 아래</label><input id="s_DB" type="range" min="0" max="1.2" step="0.01"><output></output></div>
+  <div class="row"><label for="s_SB">크기</label><input id="s_SB" type="range" min="0.4" max="1.5" step="0.01"><output></output></div>
+  <div class="btns"><button class="btn" id="reset">처음 값</button><button class="btn pri" id="copy">값 복사</button></div>
+  <pre id="out"></pre>
+ </div>
+</div>
+<script type="application/json" id="data">/*DATA*/null</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';import * as SU from 'three/addons/utils/SkeletonUtils.js';
+const D=JSON.parse(document.getElementById('data').textContent),EX=D.EYE_X,EZ0=D.EYE_Z,cs=Math.cos(D.CAMP),sn=Math.sin(D.CAMP),KEYS=Object.keys(D.faces);
+const KS=['PXF','KE','EY','MZ','KB','DB','SB'];
+const ref={};for(const k of KEYS)ref[k]=Object.fromEntries(KS.map(n=>[n,D.faces[k].L[n]]));
+let cur=JSON.parse(JSON.stringify(ref)),who='all',hairI=0,yaw=0;
+try{const s=JSON.parse(localStorage.getItem('laytool')||'null');if(s&&s.cur)for(const k of KEYS)if(s.cur[k])Object.assign(cur[k],s.cur[k]);if(s&&s.who)who=s.who;if(s&&s.hair!=null)hairI=s.hair;}catch(e){}
+const save=()=>{try{localStorage.setItem('laytool',JSON.stringify({cur,who,hair:hairI}));}catch(e){}};
+
+/* 렌더러 */
+const stage=document.getElementById('stage'),r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setPixelRatio(Math.min(devicePixelRatio,2));stage.prepend(r.domElement);
+const sc=new THREE.Scene();sc.background=new THREE.Color(0x9fcf6a);sc.add(new THREE.HemisphereLight(0xffffff,0x8a9a70,1.5));const dl=new THREE.DirectionalLight(0xffffff,1.7);dl.position.set(-3,6,4);sc.add(dl);
+const cam=new THREE.OrthographicCamera(-1,1,1,-1,.01,50);
+const g=await new GLTFLoader().parseAsync(Uint8Array.from(atob(D.glb),c=>c.charCodeAt(0)).buffer,'');
+const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,metalness:0});let skm=null;g.scene.traverse(m=>{if(m.isMesh){m.material=mat;m.frustumCulled=false;}if(m.isSkinnedMesh)skm=m;});
+g.scene.updateMatrixWorld(true);const HB=skm.skeleton.bones.findIndex(b=>b.name==='head'),HM=new THREE.Matrix4().multiplyMatrices(skm.skeleton.boneInverses[HB],skm.bindMatrix);/* 게임과 같이 head 뼈 밑에 붙인다 */
+
+/* 몸 메시(묶기 전 자세)에 카메라 방향으로 쏘기: 모든 선이 같은 방향이라 그 방향에 수직인 평면에 삼각형을 칸으로 나눠 둔다 */
+const BP=skm.geometry.attributes.position.array,BN=skm.geometry.attributes.normal.array,BI=skm.geometry.index.array;
+const d3=[0,-sn,-cs],u2=[0,cs,-sn],CELL=.01,grid=new Map(),TRI=[];
+for(let t=0;t<BI.length;t+=3){const a=BI[t],b=BI[t+1],c=BI[t+2];if(BP[a*3+1]<.45&&BP[b*3+1]<.45&&BP[c*3+1]<.45)continue;
+ const P=[a,b,c].map(i=>[BP[i*3],BP[i*3+1]*u2[1]+BP[i*3+2]*u2[2]]),x0=Math.floor(Math.min(...P.map(p=>p[0]))/CELL),x1=Math.floor(Math.max(...P.map(p=>p[0]))/CELL),y0=Math.floor(Math.min(...P.map(p=>p[1]))/CELL),y1=Math.floor(Math.max(...P.map(p=>p[1]))/CELL);
+ const id=TRI.length;TRI.push([a,b,c]);for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){const k=x+'_'+y;let L=grid.get(k);if(!L)grid.set(k,L=[]);L.push(id);}}
+const shoot=(o)=>{/* o: 출발점, d3 방향으로 가장 먼저 만나는 면 */const k=Math.floor(o[0]/CELL)+'_'+Math.floor((o[1]*u2[1]+o[2]*u2[2])/CELL),L=grid.get(k);if(!L)return null;let best=null;
+ for(const id of L){const [a,b,c]=TRI[id],A=[BP[a*3],BP[a*3+1],BP[a*3+2]],e1=[BP[b*3]-A[0],BP[b*3+1]-A[1],BP[b*3+2]-A[2]],e2=[BP[c*3]-A[0],BP[c*3+1]-A[1],BP[c*3+2]-A[2]];
+  const p=[d3[1]*e2[2]-d3[2]*e2[1],d3[2]*e2[0]-d3[0]*e2[2],d3[0]*e2[1]-d3[1]*e2[0]],det=e1[0]*p[0]+e1[1]*p[1]+e1[2]*p[2];if(Math.abs(det)<1e-12)continue;const inv=1/det,s=[o[0]-A[0],o[1]-A[1],o[2]-A[2]],u=(s[0]*p[0]+s[1]*p[1]+s[2]*p[2])*inv;if(u<-1e-6||u>1+1e-6)continue;
+  const q=[s[1]*e1[2]-s[2]*e1[1],s[2]*e1[0]-s[0]*e1[2],s[0]*e1[1]-s[1]*e1[0]],v=(d3[0]*q[0]+d3[1]*q[1]+d3[2]*q[2])*inv;if(v<-1e-6||u+v>1+1e-6)continue;const t=(e2[0]*q[0]+e2[1]*q[1]+e2[2]*q[2])*inv;if(t<0||(best&&t>=best.t))continue;best={t,a,b,c,u,v};}
+ if(!best)return null;const w=1-best.u-best.v,n=[0,1,2].map(j=>BN[best.a*3+j]*w+BN[best.b*3+j]*best.u+BN[best.c*3+j]*best.v),l=Math.hypot(...n);return {p:[o[0]+d3[0]*best.t,o[1]+d3[1]*best.t,o[2]+d3[2]*best.t],n:n.map(x=>x/l)};};
+
+/* 기준 배치의 화면 좌표 → 새 배치의 화면 좌표(faces15 build_flat의 P/PK/PM과 같은 식) */
+const geomOf=(L)=>({u:EX/L.PXF,XE:L.KE*EX,EZ:EZ0+L.EY*EX,XB:L.KB*EX,ZB:EZ0+L.EY*EX-L.DB*EX,w:EX/L.PXF*L.SB,MZ:L.MZ});
+const faceGeo=(k,L)=>{const F=D.faces[k],R=geomOf(ref[k]),N=geomOf(L),n=F.g.length,pos=new Float32Array(n*3),nor=new Float32Array(n*3);let miss=0;
+ for(let i=0;i<n;i++){let x=F.S[i*2],z=F.S[i*2+1];const gi=F.g[i],s=x<0?-1:1;
+  if(gi===0){const a=(x*s-R.XE)/R.u,b=(z-R.EZ)/R.u;x=s*(N.XE+a*N.u);z=N.EZ+b*N.u;}
+  else if(gi===1){const a=(x*s-R.XB)/R.w,b=(z-R.ZB)/R.w;x=s*(N.XB+a*N.w);z=N.ZB+b*N.w;}
+  else{const a=x/R.u,b=(z-R.MZ)/R.u;x=a*N.u;z=N.MZ+b*N.u;}
+  const Y=z-EZ0,o=[D.A[0]+x-.9*d3[0],D.A[1]+Y*cs-.9*d3[1],D.A[2]-Y*sn-.9*d3[2]],h=shoot(o);
+  if(!h){miss++;pos.set([NaN,NaN,NaN],i*3);continue;}const H=F.h[i];for(let j=0;j<3;j++){pos[i*3+j]=h.p[j]+h.n[j]*H;nor[i*3+j]=h.n[j];}}
+ const col=new Float32Array(n*3);F.c.forEach((ci,i)=>col.set(D.pal[ci],i*3));
+ const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.BufferAttribute(pos,3));ge.setAttribute('normal',new THREE.BufferAttribute(nor,3));ge.setAttribute('color',new THREE.BufferAttribute(col,3));ge.setIndex(F.f);ge.userData.miss=miss;return ge;};
+window.__faceGeo=faceGeo;
+
+/* 헤어 */
+const hairGeo=D.hair.map(hd=>{const P=[],N=[],Cc=[],col=new THREE.Color();for(const [k,hex] of [['hair',hd.color.hair],['cap',hd.color.cap]]){let ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.Float32BufferAttribute(hd[k].v,3));ge.setIndex(hd[k].f);ge=BGU.toCreasedNormals(ge,.55);const p=ge.attributes.position.array,n=ge.attributes.normal.array;col.set(hex);for(let i=0;i<p.length;i++){P.push(p[i]);N.push(n[i]);Cc.push(i%3===0?col.r:i%3===1?col.g:col.b);}}
+ const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.Float32BufferAttribute(P,3));ge.setAttribute('normal',new THREE.Float32BufferAttribute(N,3));ge.setAttribute('color',new THREE.Float32BufferAttribute(Cc,3));return ge;});
+
+/* 장면: 얼굴마다 몸 하나 */
+const RIG={};KEYS.forEach((k,i)=>{const body=SU.clone(g.scene),wrap=new THREE.Group(),hb=body.getObjectByName('head');wrap.add(body);
+ const face=new THREE.Mesh(new THREE.BufferGeometry(),mat),hair=new THREE.Mesh(hairGeo[hairI],mat);for(const m of [face,hair]){m.matrix.copy(HM);m.matrixAutoUpdate=false;m.frustumCulled=false;hb.add(m);}sc.add(wrap);RIG[k]={wrap,face,hair};});
+const VIEWS=[['게임 정면',0],['사분면',.7],['옆',1.35],['뒤 사분면',2.4]];
+const vb=document.getElementById('views');VIEWS.forEach(([t,y],i)=>{const b=document.createElement('button');b.className='chip';b.textContent=t;b.setAttribute('aria-pressed',i===0);b.onclick=()=>{yaw=y;[...vb.children].forEach(x=>x.setAttribute('aria-pressed',x===b));draw();};vb.appendChild(b);});
+let drag=null;stage.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;drag=[e.clientX,yaw];stage.setPointerCapture(e.pointerId);});stage.addEventListener('pointermove',e=>{if(!drag)return;yaw=drag[1]+(e.clientX-drag[0])*.01;[...vb.children].forEach(x=>x.setAttribute('aria-pressed',false));draw();});stage.addEventListener('pointerup',()=>drag=null);let zoom=1;stage.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.min(1.6,Math.max(.45,zoom*Math.exp(e.deltaY*.001)));draw();},{passive:false});
+
+const draw=()=>{const W=stage.clientWidth,H=stage.clientHeight;r.setSize(W,H,false);const shown=who==='all'?KEYS:[who],n=shown.length,asp=W/H,hh=Math.max(.6,1.2*n/asp*.5)*zoom;
+ cam.top=hh;cam.bottom=-hh;cam.left=-hh*asp;cam.right=hh*asp;cam.updateProjectionMatrix();
+ const gap=1.15;KEYS.forEach(k=>{const R=RIG[k],j=shown.indexOf(k);R.wrap.visible=j>=0;R.wrap.position.set((j-(n-1)/2)*gap,0,0);R.wrap.rotation.y=yaw;R.hair.geometry=hairGeo[hairI];});
+ const ty=.82;cam.position.set(-d3[0]*10,ty-d3[1]*10,-d3[2]*10);cam.lookAt(0,ty,0);r.render(sc,cam);};
+const rebuild=()=>{const t0=performance.now();let miss=0;for(const k of KEYS){const ge=faceGeo(k,cur[k]);RIG[k].face.geometry.dispose();RIG[k].face.geometry=ge;miss+=ge.userData.miss;}
+ document.getElementById('busy').textContent=miss?'머리 밖으로 나간 점 '+miss+'개':'';draw();};
+
+/* 패널 */
+const fmt={sz:v=>Math.round(v)+'%',KE:v=>(+v).toFixed(2),EY:v=>(+v>0?'+':'')+(+v).toFixed(2),MZ:v=>(+v).toFixed(3),KB:v=>(+v).toFixed(2),DB:v=>(+v).toFixed(2),SB:v=>Math.round(v*100)+'%'};
+const target=()=>who==='all'?KEYS:[who],base=()=>cur[target()[0]];
+const sync=()=>{const L=base();for(const id of Object.keys(fmt)){const el=document.getElementById('s_'+id),v=id==='sz'?275/L.PXF*100:L[id];el.value=v;el.nextElementSibling.textContent=fmt[id](v);}
+ document.querySelectorAll('#who button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===who));document.querySelectorAll('#hair button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.h===hairI));
+ const o={};for(const k of KEYS){const d={};for(const n of KS)if(Math.abs(cur[k][n]-ref[k][n])>1e-9)d[n]=+(+cur[k][n]).toFixed(4);o[k]=Object.keys(d).length?{...Object.fromEntries(KS.map(n=>[n,+(+cur[k][n]).toFixed(4)]))}:'변경 없음';}
+ document.getElementById('out').textContent=JSON.stringify(o).replace(/"U"/,'"여자 01(U)"').replace(/"V"/,'"남자 01(V)"');};
+let tm=0;for(const id of Object.keys(fmt)){const el=document.getElementById('s_'+id);el.addEventListener('input',()=>{const v=+el.value;for(const k of target()){if(id==='sz')cur[k].PXF=275*100/v;else cur[k][id]=v;}el.nextElementSibling.textContent=fmt[id](v);sync();save();cancelAnimationFrame(tm);tm=requestAnimationFrame(rebuild);});}
+document.querySelectorAll('#who button').forEach(b=>b.onclick=()=>{who=b.dataset.k;if(who==='all'){const L=cur[KEYS[0]];for(const k of KEYS)Object.assign(cur[k],L);rebuild();}else draw();sync();save();});
+document.querySelectorAll('#hair button').forEach(b=>b.onclick=()=>{hairI=+b.dataset.h;sync();save();draw();});
+document.getElementById('reset').onclick=()=>{for(const k of target())Object.assign(cur[k],ref[k]);sync();save();rebuild();};
+document.getElementById('copy').onclick=async e=>{const t=document.getElementById('out').textContent;try{await navigator.clipboard.writeText(t);e.target.textContent='복사됨';}catch(_){const s=getSelection(),rg=document.createRange();rg.selectNodeContents(document.getElementById('out'));s.removeAllRanges();s.addRange(rg);e.target.textContent='선택됨 · 복사하세요';}setTimeout(()=>e.target.textContent='값 복사',1600);};
+addEventListener('resize',draw);sync();rebuild();window.__ready=1;
+</script>

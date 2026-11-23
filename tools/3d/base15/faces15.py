@@ -258,8 +258,8 @@ def build(st):
 # 볼터치 가장자리는 몸 피부색(HEX['skin'])과 같게 푼다. 층마다 0.0012씩 띄워 겹친다.
 SKIN = HEX['skin']
 PX, CX = 326.0, 887.0          # 그림 261px(얼굴 중심~눈 가운데)를 EYE_X의 0.8배로: 1:1이면 볼터치 바깥쪽이 머리 윤곽 밖으로 넘어간다
-# 배치(파츠 모양은 그림 그대로, 자리·크기만 머리에 맞춘다). PXF: 파츠 축척(그림 px당 EYE_X/PXF), KE: 눈 가운데 x(EYE_X 배), MZ: 입 높이, KB·DB·SB: 볼터치 x(EYE_X 배)·눈 아래 깊이(EYE_X 배)·크기 배율
-LAY = dict(PXF=275.0, KE=0.98, MZ=0.71, KB=1.1, DB=0.5, SB=0.85)   # 0.8배 통째 축소(PX)는 파츠가 가운데로 몰리고 입이 올라가 보여 따로 놓는다
+# 배치(파츠 모양은 그림 그대로, 자리·크기만 머리에 맞춘다). PXF: 파츠 축척(그림 px당 EYE_X/PXF), KE: 눈 가운데 x(EYE_X 배), MZ: 입 높이, KB·DB·SB: 볼터치 x(EYE_X 배)·눈 아래 깊이(EYE_X 배)·크기 배율, EY: 눈 높이 이동(EYE_X 배). 얼굴마다 FLAT의 'lay'로 덮어쓸 수 있다(배치 도구 laytool.html)
+LAY = dict(PXF=275.0, KE=0.98, EY=0.0, MZ=0.71, KB=1.1, DB=0.5, SB=0.85)   # 0.8배 통째 축소(PX)는 파츠가 가운데로 몰리고 입이 올라가 보여 따로 놓는다
 if os.environ.get('LAY'): LAY.update(json.loads(os.environ['LAY']))
 CAMP = math.atan2(125, 169.7)          # 게임 카메라가 내려다보는 각(play_game.js setCam: 수평 169.7, 높이 125)
 
@@ -391,7 +391,8 @@ def G(h):
 def build_flat(q):
     global PROJ
     PROJ = proj_view; proj_view.miss = 0
-    M = Mesh(); EZ = C.EYE_Z; u = C.EYE_X / LAY['PXF']; EYL = q['eyl']; ECX = q['iris'][0]
+    LAY = dict(globals()['LAY'], **q.get('lay', {}))
+    M = Mesh(); EZ = C.EYE_Z + LAY['EY'] * C.EYE_X; u = C.EYE_X / LAY['PXF']; EYL = q['eyl']; ECX = q['iris'][0]
     XE = LAY['KE'] * C.EYE_X                                                         # 눈·눈썹: 홍채 가운데를 (±XE, EZ)에 두고 그림 모양 그대로
     def P(s, px, py): return (s * (XE + (ECX - px) * u), EZ + (EYL - py) * u)
     PB = P
