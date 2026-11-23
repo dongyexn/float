@@ -11,6 +11,7 @@
 | `base15.glb` | 게임용 모델: 스킨 메시 1개(약 2,700 삼각형), 얼굴은 꼭짓점 색으로 구움 |
 | `hair01_lite.json` | 헤어 01 데이터(프로젝트 문서 float-hair 참조) |
 | `faces15.py`, `faces15.json` | 얼굴 생성기와 결과(머리 표면에 투영한 파츠, 꼭짓점 색): 점토 얼굴 20종(A~T, 지금은 안 씀) + 납작하게 찍은 새 얼굴(U = 여자 01, V = 남자 01. 그림 시안의 좌표·색을 옮겨 게임 카메라 방향으로 머리에 투영, 색은 게임 화면 실측으로 보정. 법선 `n`(몸 메시에서 보간)·성별 `sex` 포함) |
+| `facenorm.py`, `base15_n0.npy` | 얼굴 음영 줄이기(`python3 facenorm.py 0.55`): `base15.glb` 모양은 그대로, 얼굴 굴곡 세기를 줄인 만큼만 법선을 돌린다(원본 법선 `base15_n0.npy` 기준). 돌린 뒤 `faces15.py` 다시 실행 |
 | `laytool.py`, `laytool_src.html` | 얼굴 배치 도구(`python3 laytool.py` → `build/laytool.html`): 눈·입·볼터치의 자리·크기를 슬라이더로 옮겨 보고 값을 복사한다. 확정 값은 `faces15.py`의 `LAY`(또는 얼굴별 `FLAT[..]['lay']`)에 넣고 다시 굽는다 |
 | `mktest.py` | 시험판 빌드 |
 

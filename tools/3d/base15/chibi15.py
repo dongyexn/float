@@ -69,6 +69,7 @@ def rcone(X, Y, Z, a, b, r1, r2):
     d3 = (np.sqrt(x2 * a2 * il2) + y * rr) * il2 - r1
     return np.where(np.sign(z) * a2 * z2 > k, d1, np.where(np.sign(y) * a2 * y2 < k, d2, d3))
 
+FK = 1.0                                           # 얼굴 굴곡 세기(facenorm.py가 음영만 줄일 때 바꿔 쓴다)
 def gauss(X, Z, cx, cz, sx, sz): return np.exp(-(((X - cx) / sx) ** 2 + ((Z - cz) / sz) ** 2))
 
 def core_sdf(X, Y, Z):
@@ -86,7 +87,7 @@ def core_sdf(X, Y, Z):
     cheek = gauss(A, Z, 0.270, 0.715, 0.110, 0.095)
     muzz = gauss(X, Z, 0.0, MOUTH_Z + 0.015, 0.140, 0.080)
     nose = gauss(X, Z, 0.0, NOSE_Z, 0.032, 0.030)
-    head = head + fw * (Q['sockD'] * sock - Q['cheekH'] * cheek - Q['muzzH'] * muzz - Q['noseH'] * nose + Q['lipD'] * lip)
+    head = head + FK * fw * (Q['sockD'] * sock - Q['cheekH'] * cheek - Q['muzzH'] * muzz - Q['noseH'] * nose + Q['lipD'] * lip)
     # ---- 헤어 01(v62)을 맞춘 두상 수정(float-hair/HANDOFF.md '두상 변경 기록' 1·3)
     # 3. 눈썹뼈·콧대 음영: 눈자리는 조금 더 오목, 눈썹뼈·콧대는 볼록, 미간은 채워 음영이 지지 않게
     sock2 = gauss(A, Z, EYE_X + 0.006, EYE_Z + 0.008, 0.086, 0.084)
@@ -94,7 +95,7 @@ def core_sdf(X, Y, Z):
     glab = gauss(X, Z, 0.0, EYE_Z + 0.055, 0.075, 0.070)
     zb = sstep(NOSE_Z, EYE_Z, Z)                                          # 인계서에 정의가 없어 '코에서 눈높이로 갈수록 1'로 둠(콧대가 위로 갈수록 넓어짐)
     bridge = np.exp(-(X / (0.052 + 0.026 * zb)) ** 2) * sstep(NOSE_Z - 0.01, NOSE_Z + 0.03, Z) * sstep(EYE_Z + 0.03, EYE_Z - 0.04, Z)
-    head = head + 0.45 * fw * (0.020 * sock2 - 0.010 * brow - 0.010 * bridge - 0.010 * glab)
+    head = head + FK * 0.45 * fw * (0.020 * sock2 - 0.010 * brow - 0.010 * bridge - 0.010 * glab)
     # 1. 뒤통수 하부~목덜미를 둥글게 들여 넣는다(뒷머리 밑단이 뜨지 않게)
     head = head + 0.035 * sstep(-0.02, 0.30, Y) * sstep(0.98, 0.55, Z) ** 2
     return head

@@ -259,7 +259,7 @@ def build(st):
 SKIN = HEX['skin']
 PX, CX = 326.0, 887.0          # 그림 261px(얼굴 중심~눈 가운데)를 EYE_X의 0.8배로: 1:1이면 볼터치 바깥쪽이 머리 윤곽 밖으로 넘어간다
 # 배치(파츠 모양은 그림 그대로, 자리·크기만 머리에 맞춘다). PXF: 파츠 축척(그림 px당 EYE_X/PXF), KE: 눈 가운데 x(EYE_X 배), MZ: 입 높이, KB·DB·SB: 볼터치 x(EYE_X 배)·눈 아래 깊이(EYE_X 배)·크기 배율, EY: 눈 높이 이동(EYE_X 배). 얼굴마다 FLAT의 'lay'로 덮어쓸 수 있다(배치 도구 laytool.html)
-LAY = dict(PXF=275.0, KE=0.98, EY=0.0, MZ=0.71, KB=1.1, DB=0.5, SB=0.85)   # 0.8배 통째 축소(PX)는 파츠가 가운데로 몰리고 입이 올라가 보여 따로 놓는다
+LAY = dict(PXF=266.99, KE=0.92, EY=0.05, MZ=0.70, KB=1.35, DB=0.44, SB=0.87)   # 2026-11-24 배치 도구로 사용자가 정한 값(여자·남자 같음)   # 0.8배 통째 축소(PX)는 파츠가 가운데로 몰리고 입이 올라가 보여 따로 놓는다
 if os.environ.get('LAY'): LAY.update(json.loads(os.environ['LAY']))
 CAMP = math.atan2(125, 169.7)          # 게임 카메라가 내려다보는 각(play_game.js setCam: 수평 169.7, 높이 125)
 
