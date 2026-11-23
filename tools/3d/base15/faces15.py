@@ -258,6 +258,9 @@ def build(st):
 # 볼터치 가장자리는 몸 피부색(HEX['skin'])과 같게 푼다. 층마다 0.0012씩 띄워 겹친다.
 SKIN = HEX['skin']
 PX, CX = 326.0, 887.0          # 그림 261px(얼굴 중심~눈 가운데)를 EYE_X의 0.8배로: 1:1이면 볼터치 바깥쪽이 머리 윤곽 밖으로 넘어간다
+# 배치(파츠 모양은 그림 그대로, 자리·크기만 머리에 맞춘다). PXF: 파츠 축척(그림 px당 EYE_X/PXF), KE: 눈 가운데 x(EYE_X 배), MZ: 입 높이, KB·DB·SB: 볼터치 x(EYE_X 배)·눈 아래 깊이(EYE_X 배)·크기 배율
+LAY = dict(PXF=275.0, KE=0.98, MZ=0.71, KB=1.1, DB=0.5, SB=0.85)   # 0.8배 통째 축소(PX)는 파츠가 가운데로 몰리고 입이 올라가 보여 따로 놓는다
+if os.environ.get('LAY'): LAY.update(json.loads(os.environ['LAY']))
 CAMP = math.atan2(125, 169.7)          # 게임 카메라가 내려다보는 각(play_game.js setCam: 수평 169.7, 높이 125)
 
 def proj_view(P):
@@ -388,17 +391,25 @@ def G(h):
 def build_flat(q):
     global PROJ
     PROJ = proj_view; proj_view.miss = 0
-    M = Mesh(); EZ = C.EYE_Z; u = C.EYE_X / PX; EYL = q['eyl']
-    def P(s, px, py): return (s * (CX - px) * u, EZ + (EYL - py) * u)
+    M = Mesh(); EZ = C.EYE_Z; u = C.EYE_X / LAY['PXF']; EYL = q['eyl']; ECX = q['iris'][0]
+    XE = LAY['KE'] * C.EYE_X                                                         # 눈·눈썹: 홍채 가운데를 (±XE, EZ)에 두고 그림 모양 그대로
+    def P(s, px, py): return (s * (XE + (ECX - px) * u), EZ + (EYL - py) * u)
     PB = P
+    bx0, by0 = q['blush'][:2]; SB = LAY['SB']
+    XB = LAY['KB'] * C.EYE_X if LAY['KB'] is not None else (CX - bx0) * u
+    ZB = EZ - (LAY['DB'] * C.EYE_X if LAY['DB'] is not None else (by0 - EYL) * u)
+    def PK(s, px, py): return (s * (XB + (bx0 - px) * u * SB), ZB + (by0 - py) * u * SB)   # 볼터치·빗금: 볼 가운데 기준
+    my0 = sum(y for _, y in q['mouthp']) / len(q['mouthp'])
+    ZM = LAY['MZ'] if LAY['MZ'] is not None else EZ - (my0 - EYL) * u
+    def PM(px, py): return (px - CX) * u, ZM + (my0 - py) * u                          # 입: 가운데 기준
     LC, RC = G(q['lash']), G(q['rim'])
     for s in (1, -1):
         Q = lambda pts: [P(s, x, y) for x, y in pts]
         bx, by, brx, bry = q['blush']
-        soft(M, [P(s, bx + brx * math.cos(t), by + bry * math.sin(t)) for t in np.linspace(0, 2 * math.pi, 17)[:-1]], .0012, radial=(mix(SKIN, G('#fbc7ba'), .9), SKIN, .0), rings=5)
+        soft(M, [PK(s, bx + brx * math.cos(t), by + bry * math.sin(t)) for t in np.linspace(0, 2 * math.pi, 17)[:-1]], .0012, radial=(mix(SKIN, G('#fbc7ba'), .9), SKIN, .0), rings=5)
         for (x0, y0, x1, y1) in q['hatch']:
             if s > 0: x0, x1 = 2 * bx - x1, 2 * bx - x0; y0, y1 = y1, y0                 # 빗금은 양쪽 모두 같은 방향
-            ribbon(M, Q([(x0, y0), ((x0 + x1) / 2, (y0 + y1) / 2), (x1, y1)]), 4 * u, .0030, mix(SKIN, G('#f3b3aa'), .8), taper=(.9, .9))
+            ribbon(M, [PK(s, x, y) for x, y in [(x0, y0), ((x0 + x1) / 2, (y0 + y1) / 2), (x1, y1)]], 4 * u * SB, .0030, mix(SKIN, G('#f3b3aa'), .8), taper=(.9, .9))
         flat(M, Q(cr(q['scl'], 2, True)), .0012, '#fdf6ee', rings=3)
         for sh in q.get('shade', []): flat(M, Q(sh), .0020, G('#e3e0d9'))
         cx, cy, rx, ry = q['iris']; T0, T1, T2 = q['tone']
@@ -422,7 +433,7 @@ def build_flat(q):
         flat(M, pill, .0090, '#ffffff')
         QB = lambda pts: [PB(s, x, y) for x, y in pts]
         band(M, QB(cr(q['brow_lo'], 2)), QB(cr(q['brow_up'], 2)), .0012, G(q['brow']))
-    ribbon(M, [P(1, 2 * CX - x, y) for x, y in q['mouthp']], 5.5 * u, .0012, MOUTH_IN, taper=(1, 1))
+    ribbon(M, [PM(x, y) for x, y in q['mouthp']], 5.5 * u, .0012, MOUTH_IN, taper=(1, 1))
     V = np.array(M.v); Fc = np.array(M.f); e = 2e-3; x, y, z = V[:, 0], V[:, 1], V[:, 2]
     nn = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1)
     fn = np.cross(V[Fc[:, 1]] - V[Fc[:, 0]], V[Fc[:, 2]] - V[Fc[:, 0]]); fl = (fn * nn[Fc].mean(1)).sum(1) < 0; Fc[fl]=Fc[fl][:, ::-1]
