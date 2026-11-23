@@ -55,6 +55,8 @@ def proj(P):
     n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
     return np.stack([x, y, z], 1), n
 
+PROJ = proj          # 표면에 붙이는 방법(기본: 정면에서). 새 얼굴은 proj_view로 바꿔 쓴다
+
 class Mesh:
     def __init__(self): self.v, self.c, self.f = [], [], []
     def add(self, V, col, F):
@@ -69,7 +71,7 @@ def dome(M, out2, h, base, col, rings=3):
     for r in range(1, rings + 1):
         rho = r / rings
         for p in out2: P2.append(c + (p - c) * rho); H.append(base + h * math.sqrt(max(0.0, 1 - rho * rho)))
-    P2 = np.array(P2); loc, nor = proj(P2); V = loc + nor * (np.array(H)[:, None] + LIFT)
+    P2 = np.array(P2); loc, nor = PROJ(P2); V = loc + nor * (np.array(H)[:, None] + LIFT)
     F = [[0, 1 + k, 1 + (k + 1) % n] for k in range(n)]
     for r in range(1, rings):
         a, b = 1 + (r - 1) * n, 1 + r * n
@@ -88,7 +90,7 @@ def stroke(M, path2, w, h, col, seg=4, sub=2):
         e = min(i, N - 1 - i) / (1.5 * sub / 2 + 0.5); tp = math.sqrt(min(1.0, e)) if e < 1 else 1.0
         for k in range(seg + 1):
             a = math.pi * k / seg; P2.append(p + nn * (math.cos(a) * w * max(tp, 0.25))); H.append(math.sin(a) * h * max(tp, 0.2) - 0.003 * K)
-    loc, nor = proj(np.array(P2)); V = loc + nor * (np.array(H)[:, None] + LIFT); F = []
+    loc, nor = PROJ(np.array(P2)); V = loc + nor * (np.array(H)[:, None] + LIFT); F = []
     for i in range(N - 1):
         a, b = i * (seg + 1), (i + 1) * (seg + 1)
         for k in range(seg): F += [[a + k, b + k, b + k + 1], [a + k, b + k + 1, a + k + 1]]
@@ -250,12 +252,33 @@ def build(st):
 
 
 # ───────── 새 얼굴(납작하게 찍은 눈) ─────────
-# 그림 시안(1024×665, 얼굴 중심 x=512, 눈 높이 y=318)에서 잰 좌표·색을 그대로 옮긴다. 눈 가운데까지 271px = base15의 EYE_X.
-# 게임 카메라가 위에서 내려다봐 세로가 눌리므로 눈·속눈썹·눈썹 두께는 세로 1.25배, 입은 위로 올리고 너비 0.7배, 선 색은 그림보다 어둡게 넣는다.
-# 볼터치 가장자리는 몸 피부색(HEX['skin'])과 같게 풀고, 눈썹은 헤어 색(hair01_lite.json)을 쓴다. 층마다 0.0012씩 띄워 겹친다.
+# 그림 시안(1774×887 한 장: 위 여자, 아래 남자. 얼굴 중심 x=887)에서 잰 좌표·색을 그대로 옮긴다. 그림의 비율은 그대로 두고 머리에 들어가도록 전체를 줄여 붙인다(PX).
+# 그림의 왼쪽 눈(바깥쪽이 그림 왼쪽)만 재서 좌우 대칭으로 쓴다. 하이라이트만 양쪽 다 화면 왼쪽.
+# 게임 카메라가 위에서 내려다봐 세로가 눌리고 눈이 기울어 보이므로, 정면이 아니라 카메라 방향으로 머리 표면에 투영한다(proj_view). 게임 화면이 밝게 나와 색은 DK로 보정한다(게임 화면을 그림과 대조해 맞춘 값).
+# 볼터치 가장자리는 몸 피부색(HEX['skin'])과 같게 푼다. 층마다 0.0012씩 띄워 겹친다.
 SKIN = HEX['skin']
-HAIR = json.load(open(os.path.join(D0, 'hair01_lite.json'), encoding='utf-8'))['color']['hair']
-PX = 271.0
+PX, CX = 326.0, 887.0          # 그림 261px(얼굴 중심~눈 가운데)를 EYE_X의 0.8배로: 1:1이면 볼터치 바깥쪽이 머리 윤곽 밖으로 넘어간다
+CAMP = math.atan2(125, 169.7)          # 게임 카메라가 내려다보는 각(play_game.js setCam: 수평 169.7, 높이 125)
+
+def proj_view(P):
+    """게임 카메라 방향으로 쏜 선이 머리 표면과 만나는 점과 바깥 법선. 입력은 화면 좌표(x, 눈높이 기준 위쪽)를 (x, EYE_Z+위쪽)으로 준 것.
+    이렇게 붙이면 주민이 카메라를 볼 때 화면에 그림 그대로 보인다(정면 투영은 위에서 내려다보면 세로가 눌리고 눈이 기운다)"""
+    P = np.asarray(P, float); X, Y = P[:, 0], P[:, 1] - C.EYE_Z; cs, sn = math.cos(CAMP), math.sin(CAMP)
+    A = proj(np.array([[0.0, C.EYE_Z]]))[0][0]                                     # 기준점: 눈높이 정중앙의 표면
+    ox, oy, oz = A[0] + X, A[1] + Y * sn, A[2] + Y * cs                            # 화면 위쪽 = (0, sin, cos), 보는 방향 = (0, cos, -sin)
+    ts = np.linspace(-0.9, 0.7, 500)
+    d = C.sdf(np.repeat(ox[:, None], 500, 1), oy[:, None] + ts[None, :] * cs, oz[:, None] - ts[None, :] * sn)
+    hit = (d < 0).any(1); i = np.clip(np.argmax(d < 0, 1), 1, 499); r = np.arange(len(X))
+    d0, d1 = d[r, i - 1], d[r, i]; t = ts[i - 1] + (ts[i] - ts[i - 1]) * d0 / np.maximum(d0 - d1, 1e-9)
+    for _ in range(4):
+        f = C.sdf(ox, oy + t * cs, oz - t * sn); e = 1e-3; g = (C.sdf(ox, oy + (t + e) * cs, oz - (t + e) * sn) - C.sdf(ox, oy + (t - e) * cs, oz - (t - e) * sn)) / (2 * e)
+        t = t - f / np.where(np.abs(g) > 0.2, g, -1.0)
+    x, y, z = ox, oy + t * cs, oz - t * sn; e = 2e-3
+    n = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1)
+    n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
+    proj_view.miss += int((~hit).sum())
+    return np.stack([x, y, z], 1), n
+proj_view.miss = 0
 R = math.radians
 def hx(h):return [int(h[i:i+2],16) for i in(1,3,5)]
 def mix(a,b,t):A,Bb=hx(a),hx(b);return '#%02x%02x%02x'%tuple(int(round(A[i]+(Bb[i]-A[i])*t)) for i in range(3))
@@ -292,7 +315,7 @@ def ribbon(M,path,w,lift,col,taper=(.25,.25)):
         t=d[min(i+1,N-1)]-d[max(i-1,0)];t=t/max(np.linalg.norm(t),1e-9);n=np.array([-t[1],t[0]]);u=i/(N-1)
         tp=min(1,(u/.18)**.6*(1-taper[0])+taper[0]) if u<.18 else min(1,((1-u)/.18)**.6*(1-taper[1])+taper[1]) if u>.82 else 1
         for sg in(1,0,-1):P2.append(p+n*ws[i]*tp*sg)
-    loc,nor=proj(np.array(P2));V=loc+nor*(lift+LIFT);Fc=[]
+    loc,nor=PROJ(np.array(P2));V=loc+nor*(lift+LIFT);Fc=[]
     for i in range(N-1):
         a,b=i*3,(i+1)*3
         for k in range(2):Fc+=[[a+k,b+k,b+k+1],[a+k,b+k+1,a+k+1]]
@@ -301,7 +324,7 @@ def band(M,lo,up,lift,col):
     """두 곡선(아래·위) 사이를 채운 납작한 면. 가운데 줄을 넣어 표면 곡률을 따른다"""
     lo=np.asarray(lo,float);up=np.asarray(up,float);N=len(lo);P2=[]
     for i in range(N):P2+=[lo[i],(lo[i]+up[i])/2,up[i]]
-    loc,nor=proj(np.array(P2));V=loc+nor*(lift+LIFT);Fc=[]
+    loc,nor=PROJ(np.array(P2));V=loc+nor*(lift+LIFT);Fc=[]
     for i in range(N-1):
         a,b=i*3,(i+1)*3
         for k in range(2):Fc+=[[a+k,b+k,b+k+1],[a+k,b+k+1,a+k+1]]
@@ -322,50 +345,113 @@ def cr(pts,k=4,closed=False):
             t=j/k;o.append(tuple(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t**3)))
     if not closed:o.append(tuple(P[-1]))
     return o
-def build_u():
-    M=Mesh();EZ=C.EYE_Z;EXB=C.EYE_X;u=EXB/PX
-    VS=1.25
-    def P(s,px,py):return (s*(512-px)*u,EZ+(318-py)*u*(VS if py<430 else 1))
-    def PB(s,px,py):return (s*(512-px)*u,EZ+(318-198)*u*VS+(198-73)*u+(73-py)*u*VS)      # 눈썹(중심선 y=73)       # 그림의 왼쪽 눈(바깥쪽이 그림 왼쪽)을 양쪽에 대칭으로
-    for s in(1,-1):
-        Q=lambda pts:[P(s,x,y) for x,y in pts]
-        soft(M,[P(s,190+112*math.cos(t),506+56*math.sin(t)) for t in np.linspace(0,2*math.pi,17)[:-1]],.0012,radial=(mix(SKIN,'#f07f8c',.42),SKIN,.0),rings=5)
-        for (x0,y0,x1,y1) in((136,496,167,540),(175,489,206,536),(215,488,240,526)):
-            if s>0:x0,x1=380-x1,380-x0;y0,y1=y1,y0          # 빗금은 양쪽 모두 같은 방향
-            ribbon(M,Q([(x0,y0),((x0+x1)/2,(y0+y1)/2),(x1,y1)]),2.4*u,.0030,mix(SKIN,'#e06a7c',.55),taper=(.5,.5))
-        # 흰자 + 위쪽 그늘
-        scl=[(93,268),(150,243),(200,232),(250,231),(300,236),(340,247),(366,266),(385,297),(388,330),(378,368),(350,389),(300,398),(250,401),(200,398),(150,385),(120,364),(105,338),(97,300)]
-        flat(M,Q(cr(scl,2,True)),.0012,'#fbf7eb',rings=3)
-        band(M,Q(cr([(96,293),(160,277),(215,265),(280,262),(330,268),(368,286),(390,308)])),Q(cr([(93,268),(150,243),(205,232),(270,232),(325,241),(368,261),(391,293)])),.0020,'#ccccc2')
-        # 홍채
-        cx,cy,r=253,318,92;circ=lambda rr,n=22,ymax=398:[(cx+rr*math.cos(t),min(cy+rr*math.sin(t),ymax)) for t in np.linspace(0,2*math.pi,n+1)[:-1]]
-        flat(M,Q(circ(r)),.0030,'#33221a',rings=3)
-        flat(M,Q(circ(r-6,ymax=395)),.0042,'#93775f',rings=3)
-        flat(M,Q([(x,min(y,306+6*abs((x-cx)/r))) for x,y in circ(r-6)]),.0054,'#553c2c',rings=3)
-        flat(M,Q([(x,max(y,348)) for x,y in circ(r-6,ymax=395)]),.0054,'#d3c3a7',rings=3)
-        flat(M,Q([(251+33*math.cos(t),311+48*math.sin(t)) for t in np.linspace(0,2*math.pi,15)[:-1]]),.0066,'#40291b')
-        # 아래 속눈썹 선 + 바깥쪽 아래 잔가닥 2개
-        ribbon(M,Q(cr([(142,385),(170,392),(200,398),(250,402),(290,401),(320,397)],2)),[1.2*u,2.2*u,2.8*u,2.8*u,2.2*u,1.2*u],.0078,'#1f120e',taper=(.4,.4))
-        for b0,b1,tp in(((146,384),(156,389),(133,393)),((170,392),(182,396),(159,403))):band(M,Q([b0,((b0[0]+tp[0])/2,(b0[1]+tp[1])/2),tp]),Q([b1,((b1[0]+tp[0])/2+.3,(b1[1]+tp[1])/2+.3),(tp[0]+.2,tp[1]+.2)]),.0078,'#1f120e')
-        # 윗속눈썹: 몸통 띠 + 바깥쪽 아래 쐐기 + 가닥 2개
-        band(M,Q(cr([(22,253),(60,262),(92,268),(150,243),(200,232),(250,231),(300,236),(340,246),(372,264),(400,296)],3)),Q(cr([(22,253),(60,244),(100,226),(150,208),(200,198),(250,199),(300,211),(340,234),(375,268),(400,296)],3)),.0078,'#1f120e')
-        flat(M,Q([(58,258),(92,266),(99,300),(106,340),(88,318),(70,288)]),.0078,'#1f120e')
-        for b0,b1,tp in(((98,228),(124,214),(72,202)),((172,201),(196,198),(165,181))):band(M,Q([b0,((b0[0]*.45+tp[0]*.55),(b0[1]*.45+tp[1]*.55)),tp]),Q([b1,((b1[0]*.4+tp[0]*.6),(b1[1]*.4+tp[1]*.6)),(tp[0]+.2,tp[1]+.2)]),.0078,'#1f120e')
-        # 하이라이트(양쪽 눈 모두 화면 왼쪽 위)
-        hc=P(s,cx,cy);flat(M,sup(hc[0]-63*u,hc[1]+48*u*VS,25*u,25*u*VS,2,12),.0090,'#f9faf5')
-        # 쌍꺼풀 선
-        ribbon(M,Q(cr([(222,160),(260,162),(300,168),(350,187),(382,211)],2)),2.1*u,.0012,'#9a5a48',taper=(.4,.3))
-        # 눈썹
-        QB=lambda pts:[PB(s,x,y) for x,y in pts]
-        band(M,QB(cr([(30,92.5),(60,86),(100,81),(150,78),(200,78),(250,81),(300,87),(350,95),(390,100),(403,101)],2)),QB(cr([(30,91.5),(60,78),(100,60),(150,49),(200,46),(250,48),(300,53),(350,61),(385,74),(402,97)],2)),.0012,HAIR)
-    X=lambda px:(px-512)*u*.70;Z=lambda py:EZ+(318-(py-34))*u
-    ribbon(M,[(X(407),Z(562)),(X(419),Z(571)),(X(465),Z(570.5)),(X(512),Z(570)),(X(559),Z(570.5)),(X(605),Z(571)),(X(617),Z(562))],3.4*u,.0012,'#7a2c24',taper=(.6,.6))
-    V=np.array(M.v);Fc=np.array(M.f);e=2e-3;x,y,z=V[:,0],V[:,1],V[:,2]
-    nn=np.stack([C.sdf(x+e,y,z)-C.sdf(x-e,y,z),C.sdf(x,y+e,z)-C.sdf(x,y-e,z),C.sdf(x,y,z+e)-C.sdf(x,y,z-e)],1)
-    fn=np.cross(V[Fc[:,1]]-V[Fc[:,0]],V[Fc[:,2]]-V[Fc[:,0]]);fl=(fn*nn[Fc].mean(1)).sum(1)<0;Fc[fl]=Fc[fl][:,::-1]
-    return V,M.c,Fc
+def dk(h, k): return '#%02x%02x%02x' % tuple(int(round(v * k)) for v in hx(h))
 
-NEW = {'U': ('여자 01', 'f', build_u)}        # 글쇠: (이름, 성별, 만드는 함수)
+FLAT = {
+ 'U': dict(name='여자 01', sex='f', eyl=222, lash='#543d35', rim='#6d5449', tone=('#785c4e', '#a58577', '#c4a292'), mouth='#a15148', brow='#966457',
+           lash_up=[(476, 177), (492, 169), (520, 152), (550, 138), (580, 128), (615, 124), (650, 125), (690, 135), (725, 156), (751, 191)],
+           lash_lo=[(503, 197), (512, 182), (528, 171), (550, 163), (580, 157), (620, 155), (660, 158), (700, 165), (727, 174), (750, 190)],
+           wedge=[(476, 177), (503, 197), (499, 220), (500, 247), (490, 232), (481, 212), (478, 198)],
+           flick=[(476, 177), (478, 198), (468, 197), (459, 193), (455, 187), (457, 181), (465, 178)],
+           scl=[(503, 197), (512, 182), (528, 171), (580, 157), (660, 158), (725, 173), (745, 185), (751, 205), (753, 225), (751, 250), (742, 270), (725, 285), (700, 293), (605, 295), (575, 292), (545, 287), (520, 277), (506, 262), (500, 247), (499, 220)],
+           shade=[[(725, 175), (737, 182), (748, 195), (752, 212), (745, 200), (735, 188), (724, 180)], [(505, 196), (513, 183), (528, 172), (552, 164), (570, 160), (566, 170), (540, 177), (522, 188), (512, 200)]],
+           iris=(648, 222, 87, 75), ty=238, hill=(655, 300, 74, 50), hl=(48.5, 41, 198, 31.5, 11), rimline=[(603, 296), (640, 298), (670, 298), (702, 296)],
+           brow_up=[(522, 84), (550, 74), (580, 65), (610, 59), (640, 57), (670, 59), (700, 65), (725, 74), (738, 83)],
+           brow_lo=[(522, 86), (550, 80), (580, 74), (610, 70), (640, 69), (670, 71), (700, 75), (725, 80), (738, 84)],
+           blush=(540, 362, 100, 48), hatch=[(508, 348, 526, 381), (545, 346, 565, 381), (583, 346, 601, 376)],
+           mouthp=[(833, 386), (843, 390), (858, 393), (887, 394), (916, 393), (931, 390), (941, 386)]),
+ 'V': dict(name='남자 01', sex='m', eyl=672, lash='#5b453a', rim='#6d5448', tone=('#795b4e', '#aa897a', '#c9a797'), mouth='#a55249', brow='#614c42',
+           lash_up=[(460, 629), (480, 618), (505, 606), (535, 596), (565, 590), (600, 587), (640, 589), (685, 598), (725, 614), (754, 647)],
+           lash_lo=[(478, 640), (490, 641), (505, 634), (530, 626), (560, 620), (600, 616), (640, 615), (690, 619), (728, 630), (753, 646)],
+           wedge=[(478, 640), (490, 641), (490, 657), (493, 676), (484, 660)],
+           scl=[(490, 641), (505, 634), (560, 620), (640, 615), (728, 630), (748, 645), (753, 660), (754, 680), (751, 705), (742, 722), (725, 735), (700, 743), (605, 745), (580, 742), (555, 738), (530, 730), (512, 718), (500, 700), (494, 680), (490, 657)],
+           shade=[[(725, 628), (738, 636), (749, 648), (753, 664), (746, 653), (736, 642), (724, 634)], [(492, 642), (505, 635), (530, 627), (565, 620), (570, 630), (535, 638), (508, 646), (494, 652)]],
+           iris=(648, 672, 87, 75), ty=688, hill=(655, 750, 74, 50), hl=(48.5, 41, 649, 31.5, 12), rimline=[(603, 746), (640, 748), (670, 748), (702, 746)],
+           brow_up=[(486, 540), (500, 527), (520, 518), (550, 511), (590, 508), (630, 509), (670, 513), (710, 519), (745, 527), (759, 544)],
+           brow_lo=[(486, 542), (510, 540), (550, 538), (590, 538), (630, 541), (670, 545), (710, 550), (745, 554), (755, 554), (759, 547)],
+           blush=(540, 812, 100, 48), hatch=[(508, 798, 526, 831), (545, 796, 565, 831), (583, 796, 601, 826)],
+           mouthp=[(833, 834), (843, 838), (858, 841), (887, 842), (916, 841), (931, 838), (941, 834)]),
+}
+# 게임 화면 색 보정: 넣은 색(왼쪽)이 게임 화면에서 어떻게 보였는지(오른쪽)를 주민 클로즈업에서 잰 값. 조명·톤 보정 때문에 밝고 붉게 나온다.
+# G(목표색)은 이 표를 채널별로 거꾸로 읽어 "그림의 색으로 보이려면 넣어야 할 색"을 돌려준다.
+SEEN = [('#34261f', '#482e24'), ('#4d423e', '#5b463a'), ('#574942', '#7c5e4c'), ('#674c46', '#945e4d'), ('#705b53', '#c6a38f'), ('#82685e', '#d5b3a2'), ('#c4a292', '#f5e2d5'), ('#e4b491', '#feeeda')]
+ADJ = dict(top=(.90, .91, .84), mid=(.85, .85, .86))      # 표로 맞춘 뒤에도 남은 차이(게임 화면 실측/그림)를 한 번 더 나눈 값
+def adj(h, k): return '#%02x%02x%02x' % tuple(int(round(v * f)) for v, f in zip(hx(h), ADJ[k]))
+MOUTH_IN = '#5a302e'            # 입은 붉은 색이라 위 표로는 안 맞아 따로 잰 값(그림 #a15148로 보이게)
+def G(h):
+    o = []
+    for c in range(3):
+        xs = [0] + [hx(a)[c] for a, _ in SEEN] + [255]; ys = [0] + [hx(b)[c] for _, b in SEEN] + [255]
+        k = np.argsort(ys); o.append(int(round(float(np.interp(hx(h)[c], np.array(ys)[k], np.array(xs)[k])))))
+    return '#%02x%02x%02x' % tuple(o)
+
+def build_flat(q):
+    global PROJ
+    PROJ = proj_view; proj_view.miss = 0
+    M = Mesh(); EZ = C.EYE_Z; u = C.EYE_X / PX; EYL = q['eyl']
+    def P(s, px, py): return (s * (CX - px) * u, EZ + (EYL - py) * u)
+    PB = P
+    LC, RC = G(q['lash']), G(q['rim'])
+    for s in (1, -1):
+        Q = lambda pts: [P(s, x, y) for x, y in pts]
+        bx, by, brx, bry = q['blush']
+        soft(M, [P(s, bx + brx * math.cos(t), by + bry * math.sin(t)) for t in np.linspace(0, 2 * math.pi, 17)[:-1]], .0012, radial=(mix(SKIN, G('#fbc7ba'), .9), SKIN, .0), rings=5)
+        for (x0, y0, x1, y1) in q['hatch']:
+            if s > 0: x0, x1 = 2 * bx - x1, 2 * bx - x0; y0, y1 = y1, y0                 # 빗금은 양쪽 모두 같은 방향
+            ribbon(M, Q([(x0, y0), ((x0 + x1) / 2, (y0 + y1) / 2), (x1, y1)]), 4 * u, .0030, mix(SKIN, G('#f3b3aa'), .8), taper=(.9, .9))
+        flat(M, Q(cr(q['scl'], 2, True)), .0012, '#fdf6ee', rings=3)
+        for sh in q.get('shade', []): flat(M, Q(sh), .0020, G('#e3e0d9'))
+        cx, cy, rx, ry = q['iris']; T0, T1, T2 = q['tone']
+        el = lambda k=0, n=28: [(x, y) for x, y in sup(cx, cy, rx - k, ry - k, 2.5, n)]
+        def inir(x, y, k=8):                                                          # 홍채(테두리 안쪽) 밖으로 나간 점은 안으로 당긴다
+            f = abs((x - cx) / (rx - k)) ** 2.5 + abs((y - cy) / (ry - k)) ** 2.5
+            if f > 1: g = f ** (-1 / 2.5); x, y = cx + (x - cx) * g, cy + (y - cy) * g
+            return (x, y)
+        flat(M, Q(el()), .0030, RC, rings=3)
+        flat(M, Q(el(6)), .0042, adj(G(T1), 'mid'), rings=3)
+        flat(M, Q([(x, min(y, q['ty'])) for x, y in el(6)]), .0054, adj(G(T0), 'top'), rings=3)
+        hx_, hy_, hrx, hry = q['hill']                                                 # 아래쪽 밝은 언덕
+        soft(M, Q([inir(x, y) for x, y in sup(hx_, hy_, hrx, hry, 2, 20)]), .0054, radial=(G(T2), adj(G(T1), 'mid'), .72), rings=4)
+        band(M, Q(cr(q['lash_lo'], 3)), Q(cr(q['lash_up'], 3)), .0078, LC)
+        flat(M, Q(q['wedge']), .0078, LC)
+        if q.get('flick'): flat(M, Q(cr(q['flick'], 2, True)), .0078, LC)
+        hl, hr, hy, hw, hh = q['hl']; hc = P(s, cx, hy)                               # 하이라이트: 가로로 긴 알약 모양, 양쪽 눈 모두 화면 왼쪽
+        px0 = hc[0] - (hl if s < 0 else hr) * u; pill = []
+        for sg, a0 in ((1, -90), (-1, 90)):
+            for a in range(a0, a0 + 181, 30): pill.append((px0 + sg * (hw - hh) * u + math.cos(R(a)) * hh * u, hc[1] + math.sin(R(a)) * hh * u))
+        flat(M, pill, .0090, '#ffffff')
+        QB = lambda pts: [PB(s, x, y) for x, y in pts]
+        band(M, QB(cr(q['brow_lo'], 2)), QB(cr(q['brow_up'], 2)), .0012, G(q['brow']))
+    ribbon(M, [P(1, 2 * CX - x, y) for x, y in q['mouthp']], 5.5 * u, .0012, MOUTH_IN, taper=(1, 1))
+    V = np.array(M.v); Fc = np.array(M.f); e = 2e-3; x, y, z = V[:, 0], V[:, 1], V[:, 2]
+    nn = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1)
+    fn = np.cross(V[Fc[:, 1]] - V[Fc[:, 0]], V[Fc[:, 2]] - V[Fc[:, 0]]); fl = (fn * nn[Fc].mean(1)).sum(1) < 0; Fc[fl]=Fc[fl][:, ::-1]
+    PROJ = proj
+    if proj_view.miss: print('  표면을 못 만난 점:', proj_view.miss)
+    return V, M.c, Fc
+
+NEW = {k: (q['name'], q['sex'], (lambda q=q: build_flat(q))) for k, q in FLAT.items()}        # 글쇠: (이름, 성별, 만드는 함수)
+
+def body_normals(T):
+    """three 좌표의 점들 바로 밑 base15.glb 삼각형에서 꼭짓점 법선을 무게중심 보간한 값(게임이 피부를 칠할 때 쓰는 법선과 같다)"""
+    import struct
+    b = open(os.path.join(D0, 'base15.glb'), 'rb').read(); n = struct.unpack('<I', b[12:16])[0]; j = json.loads(b[20:20 + n]); bn = b[20 + n + 8:]
+    def acc(i, dt=np.float32, k=3):
+        a = j['accessors'][i]; v = j['bufferViews'][a['bufferView']]; dt = {5123: np.uint16, 5125: np.uint32, 5126: np.float32}[a['componentType']]
+        return np.frombuffer(bn, dt, a['count'] * k, v.get('byteOffset', 0) + a.get('byteOffset', 0))
+    pr = j['meshes'][0]['primitives'][0]; BP = acc(pr['attributes']['POSITION']).reshape(-1, 3).astype(float); BN = acc(pr['attributes']['NORMAL']).reshape(-1, 3).astype(float)
+    I = acc(pr['indices'], k=1).reshape(-1, 3).astype(int); A, B, Cc = BP[I[:, 0]], BP[I[:, 1]], BP[I[:, 2]]; cen = (A + B + Cc) / 3
+    out = np.zeros_like(T)
+    for i, p in enumerate(T):
+        near = np.argsort(((cen - p) ** 2).sum(1))[:16]; best = None
+        for t in near:
+            a, e1, e2 = A[t], B[t] - A[t], Cc[t] - A[t]; nrm = np.cross(e1, e2); nn = nrm / max(np.linalg.norm(nrm), 1e-12); q = p - nn * ((p - a) @ nn)
+            d00, d01, d11, d20, d21 = e1 @ e1, e1 @ e2, e2 @ e2, (q - a) @ e1, (q - a) @ e2; den = d00 * d11 - d01 * d01
+            v = (d11 * d20 - d01 * d21) / den; w = (d00 * d21 - d01 * d20) / den; bc = np.clip([1 - v - w, v, w], 0, 1); bc = bc / bc.sum()
+            pc = bc[0] * A[t] + bc[1] * B[t] + bc[2] * Cc[t]; dist = np.linalg.norm(p - pc)
+            if best is None or dist < best[0]: best = (dist, t, bc)
+        _, t, bc = best; nv = bc[0] * BN[I[t, 0]] + bc[1] * BN[I[t, 1]] + bc[2] * BN[I[t, 2]]; out[i] = nv / max(np.linalg.norm(nv), 1e-9)
+    return out
 
 if __name__ == '__main__':
     pal = []; out = {'coord': 'three.js Y-up, +z front (base15.glb와 같은 공간)', 'names': NAMES, 'faces': {}}
@@ -383,9 +469,8 @@ if __name__ == '__main__':
         for h in Cc:
             if h not in pal: pal.append(h)
             ci.append(pal.index(h))
-        e = 2e-3; x, y, z = V[:, 0], V[:, 1], V[:, 2]                # 납작한 조각은 머리 표면의 법선을 그대로 써야 피부와 음영이 이어진다
-        n = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1); n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
-        T = np.stack([V[:, 0], V[:, 2], -V[:, 1]], 1); Nn = np.stack([n[:, 0], n[:, 2], -n[:, 1]], 1)
+        T = np.stack([V[:, 0], V[:, 2], -V[:, 1]], 1)                # 모델(x, -y 정면, z 위) → three(x, y 위, z 정면)
+        Nn = body_normals(T)                                         # 납작한 조각은 바로 밑 몸 메시의 음영 법선을 그대로 써야 피부와 이어진다
         out['faces'][st] = {'v': [round(float(a), 4) for a in T.ravel()], 'c': ci, 'f': [int(a) for a in F.ravel()], 'n': [round(float(a), 3) for a in Nn.ravel()]}
         out['names'][st] = nm; out['sex'][st] = sx
         print(st, nm, sx, 'verts', len(V), 'tris', len(F))
