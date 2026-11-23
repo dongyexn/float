@@ -280,8 +280,34 @@ def proj_view(P):
     n = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1)
     n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
     proj_view.miss += int((~hit).sum())
-    return np.stack([x, y, z], 1), n
-proj_view.miss = 0
+    if proj_view.raw: return np.stack([x, y, z], 1), n
+    # 층을 띄우는 방향: 표면 법선이 아니라 카메라 쪽으로(법선 방향으로 띄우면 위층이 화면에서 아래로 밀려 속눈썹이 흰자를 덮고 얇아 보인다).
+    # 표면에서 잰 높이는 법선으로 띄웠을 때와 같게 1/(n·카메라)를 곱한다
+    tc = np.array([0.0, -cs, sn]); k = np.maximum(n @ tc, 0.35)
+    return np.stack([x, y, z], 1), tc[None, :] / k[:, None]
+proj_view.miss = 0; proj_view.raw = False
+
+def _surf(p, it=4):
+    """점들을 거리장 표면으로 당긴다(뉴턴). 돌려주는 값 = (점, 바깥 법선)"""
+    e = 1e-3
+    for _ in range(it + 1):
+        x, y, z = p[:, 0], p[:, 1], p[:, 2]
+        g = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1) / (2 * e)
+        if _ == it: break
+        p = p - (C.sdf(x, y, z) / np.maximum((g * g).sum(1), 1e-9))[:, None] * g
+    return p, g / np.maximum(np.linalg.norm(g, axis=1, keepdims=True), 1e-9)
+
+def proj_wrap(P, s, cx, cz, K=16):
+    """볼터치: 가운데만 카메라 방향으로 찍고, 나머지는 그 점에서 머리 표면을 따라 걸어가 붙인다(화면 거리 = 표면 거리).
+    뺨을 넘어가는 부분이 허공에 평면으로 뜨지 않고 머리 옆면으로 감긴다"""
+    proj_view.raw = True; c, n0 = proj_view(np.array([[s * cx, cz]])); proj_view.raw = False
+    c, n0 = c[0], n0[0]; th = np.cross([0.0, 0.0, 1.0], n0); th /= np.linalg.norm(th); tv = np.cross(n0, th); tv /= np.linalg.norm(tv)
+    P = np.asarray(P, float); o = (P[:, 0] - s * cx)[:, None] * th + (P[:, 1] - cz)[:, None] * tv
+    L = np.linalg.norm(o, axis=1); d = o / np.maximum(L, 1e-12)[:, None]; p = np.repeat(c[None, :], len(P), 0); n = np.repeat(n0[None, :], len(P), 0)
+    for _ in range(K):
+        p, n = _surf(p + d * (L / K)[:, None], 3)
+        d = d - (d * n).sum(1)[:, None] * n; d /= np.maximum(np.linalg.norm(d, axis=1, keepdims=True), 1e-12)
+    return p, n
 R = math.radians
 def hx(h):return [int(h[i:i+2],16) for i in(1,3,5)]
 def mix(a,b,t):A,Bb=hx(a),hx(b);return '#%02x%02x%02x'%tuple(int(round(A[i]+(Bb[i]-A[i])*t)) for i in range(3))
@@ -407,10 +433,12 @@ def build_flat(q):
     for s in (1, -1):
         Q = lambda pts: [P(s, x, y) for x, y in pts]
         bx, by, brx, bry = q['blush']
+        PROJ = lambda P_, s=s: proj_wrap(P_, s, XB, ZB)                              # 볼터치·빗금은 머리 표면을 따라 감는다
         soft(M, [PK(s, bx + brx * math.cos(t), by + bry * math.sin(t)) for t in np.linspace(0, 2 * math.pi, 17)[:-1]], .0012, radial=(mix(SKIN, G('#fbc7ba'), .9), SKIN, .0), rings=5)
         for (x0, y0, x1, y1) in q['hatch']:
             if s > 0: x0, x1 = 2 * bx - x1, 2 * bx - x0; y0, y1 = y1, y0                 # 빗금은 양쪽 모두 같은 방향
             ribbon(M, [PK(s, x, y) for x, y in [(x0, y0), ((x0 + x1) / 2, (y0 + y1) / 2), (x1, y1)]], 4 * u * SB, .0030, mix(SKIN, G('#f3b3aa'), .8), taper=(.9, .9))
+        PROJ = proj_view
         flat(M, Q(cr(q['scl'], 2, True)), .0012, '#fdf6ee', rings=3)
         for sh in q.get('shade', []): flat(M, Q(sh), .0020, G('#e3e0d9'))
         cx, cy, rx, ry = q['iris']; T0, T1, T2 = q['tone']

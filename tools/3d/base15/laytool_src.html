@@ -80,13 +80,25 @@ const shoot=(o)=>{/* o: 출발점, d3 방향으로 가장 먼저 만나는 면 *
 
 /* 기준 배치의 화면 좌표 → 새 배치의 화면 좌표(faces15 build_flat의 P/PK/PM과 같은 식) */
 const geomOf=(L)=>({u:EX/L.PXF,XE:L.KE*EX,EZ:EZ0+L.EY*EX,XB:L.KB*EX,ZB:EZ0+L.EY*EX-L.DB*EX,w:EX/L.PXF*L.SB,MZ:L.MZ});
+const tri=(o,d)=>{/* 머리 삼각형 전부에 대고 쏘기(볼터치 감기용) */let best=null;for(const [a,b,c] of TRI){const A=[BP[a*3],BP[a*3+1],BP[a*3+2]],e1=[BP[b*3]-A[0],BP[b*3+1]-A[1],BP[b*3+2]-A[2]],e2=[BP[c*3]-A[0],BP[c*3+1]-A[1],BP[c*3+2]-A[2]];
+  const p=[d[1]*e2[2]-d[2]*e2[1],d[2]*e2[0]-d[0]*e2[2],d[0]*e2[1]-d[1]*e2[0]],det=e1[0]*p[0]+e1[1]*p[1]+e1[2]*p[2];if(Math.abs(det)<1e-12)continue;const inv=1/det,q0=[o[0]-A[0],o[1]-A[1],o[2]-A[2]],u=(q0[0]*p[0]+q0[1]*p[1]+q0[2]*p[2])*inv;if(u<-1e-6||u>1+1e-6)continue;
+  const q=[q0[1]*e1[2]-q0[2]*e1[1],q0[2]*e1[0]-q0[0]*e1[2],q0[0]*e1[1]-q0[1]*e1[0]],v=(d[0]*q[0]+d[1]*q[1]+d[2]*q[2])*inv;if(v<-1e-6||u+v>1+1e-6)continue;const t=(e2[0]*q[0]+e2[1]*q[1]+e2[2]*q[2])*inv;if(t<0||(best&&t>=best.t))continue;best={t,a,b,c,u,v};}
+ if(!best)return null;const w=1-best.u-best.v,n=[0,1,2].map(j=>BN[best.a*3+j]*w+BN[best.b*3+j]*best.u+BN[best.c*3+j]*best.v),l=Math.hypot(...n);return {p:[o[0]+d[0]*best.t,o[1]+d[1]*best.t,o[2]+d[2]*best.t],n:n.map(x=>x/l)};};
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],nrm=a=>{const l=Math.hypot(...a)||1;return a.map(x=>x/l);},TC=[0,sn,cs];/* 카메라 쪽 */
+const viewHit=(x,z)=>{const Y=z-EZ0;return shoot([D.A[0]+x-.9*d3[0],D.A[1]+Y*cs-.9*d3[1],D.A[2]-Y*sn-.9*d3[2]]);};
+const wrap=(s,cx,cz,x,z)=>{/* faces15 proj_wrap과 같게: 볼 가운데만 카메라 방향으로 찍고 나머지는 표면을 따라 걷는다 */const c=viewHit(s*cx,cz);if(!c)return null;const th=nrm(cross([0,1,0],c.n)),tv=nrm(cross(c.n,th)),a=x-s*cx,b=z-cz;
+ let d=[0,1,2].map(j=>a*th[j]+b*tv[j]);const L=Math.hypot(...d);if(L<1e-9)return c;d=d.map(v=>v/L);let p=c.p,n=c.n;const K=16;
+ for(let k=0;k<K;k++){const q=p.map((v,j)=>v+d[j]*L/K),h=tri(q.map((v,j)=>v+n[j]*.04),n.map(v=>-v));if(!h)return null;p=h.p;n=h.n;const dn=d[0]*n[0]+d[1]*n[1]+d[2]*n[2];d=nrm(d.map((v,j)=>v-dn*n[j]));}
+ return {p,n};};
 const faceGeo=(k,L)=>{const F=D.faces[k],R=geomOf(ref[k]),N=geomOf(L),n=F.g.length,pos=new Float32Array(n*3),nor=new Float32Array(n*3);let miss=0;
- for(let i=0;i<n;i++){let x=F.S[i*2],z=F.S[i*2+1];const gi=F.g[i],s=x<0?-1:1;
+ for(let i=0;i<n;i++){let x=F.S[i*2],z=F.S[i*2+1];const gi=F.g[i],s=x<0?-1:1;let h;
   if(gi===0){const a=(x*s-R.XE)/R.u,b=(z-R.EZ)/R.u;x=s*(N.XE+a*N.u);z=N.EZ+b*N.u;}
   else if(gi===1){const a=(x*s-R.XB)/R.w,b=(z-R.ZB)/R.w;x=s*(N.XB+a*N.w);z=N.ZB+b*N.w;}
   else{const a=x/R.u,b=(z-R.MZ)/R.u;x=a*N.u;z=N.MZ+b*N.u;}
-  const Y=z-EZ0,o=[D.A[0]+x-.9*d3[0],D.A[1]+Y*cs-.9*d3[1],D.A[2]-Y*sn-.9*d3[2]],h=shoot(o);
-  if(!h){miss++;pos.set([NaN,NaN,NaN],i*3);continue;}const H=F.h[i];for(let j=0;j<3;j++){pos[i*3+j]=h.p[j]+h.n[j]*H;nor[i*3+j]=h.n[j];}}
+  h=gi===1?wrap(s,N.XB,N.ZB,x,z):viewHit(x,z);
+  if(!h){miss++;pos.set([NaN,NaN,NaN],i*3);continue;}const H=F.h[i];
+  /* 띄우는 방향: 볼터치는 법선, 나머지는 카메라 쪽(faces15와 같게) */const lv=gi===1?h.n:TC.map(v=>v/Math.max(h.n[0]*TC[0]+h.n[1]*TC[1]+h.n[2]*TC[2],.35));
+  for(let j=0;j<3;j++){pos[i*3+j]=h.p[j]+lv[j]*H;nor[i*3+j]=h.n[j];}}
  const col=new Float32Array(n*3);F.c.forEach((ci,i)=>col.set(D.pal[ci],i*3));
  const ge=new THREE.BufferGeometry();ge.setAttribute('position',new THREE.BufferAttribute(pos,3));ge.setAttribute('normal',new THREE.BufferAttribute(nor,3));ge.setAttribute('color',new THREE.BufferAttribute(col,3));ge.setIndex(F.f);ge.userData.miss=miss;return ge;};
 window.__faceGeo=faceGeo;

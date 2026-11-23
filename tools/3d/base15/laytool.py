@@ -7,17 +7,22 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import faces15 as F
 C = F.C; D0 = os.path.dirname(os.path.abspath(__file__))
-orig = F.proj_view
+orig = F.proj_view; origw = F.proj_wrap
 
 def run(q, lay):
     rec = []
+    on = [True]
     def pv(P):
-        loc, nor = orig(P); rec.append((np.asarray(P, float).copy(), loc, nor)); return loc, nor
-    pv.miss = 0; F.proj_view = pv
-    q = dict(q, lay=dict(q.get('lay', {}), **lay)); V, Cc, Fc = F.build_flat(q); F.proj_view = orig
+        loc, nor = orig(P)
+        if on[0] and not pv.raw: rec.append((np.asarray(P, float).copy(), loc, nor))
+        return loc, nor
+    def pw(P, *a, **k):
+        on[0] = False; loc, nor = origw(P, *a, **k); on[0] = True; rec.append((np.asarray(P, float).copy(), loc, nor)); return loc, nor
+    pv.miss = 0; pv.raw = False; F.proj_view = pv; F.proj_wrap = pw
+    q = dict(q, lay=dict(q.get('lay', {}), **lay)); V, Cc, Fc = F.build_flat(q); F.proj_view = orig; F.proj_wrap = origw
     S = np.vstack([r[0] for r in rec]); L = np.vstack([r[1] for r in rec]); N = np.vstack([r[2] for r in rec])
     assert len(S) == len(V), (len(S), len(V))
-    return S, ((np.asarray(V) - L) * N).sum(1), np.asarray(V), Cc, Fc
+    return S, ((np.asarray(V) - L) * N).sum(1) / np.maximum((N * N).sum(1), 1e-12), np.asarray(V), Cc, Fc   # N = 띄운 방향(카메라 쪽 또는 법선)
 
 out = {'EYE_X': C.EYE_X, 'EYE_Z': C.EYE_Z, 'CAMP': F.CAMP, 'LAY': F.LAY, 'faces': {}}
 A = F.proj(np.array([[0.0, C.EYE_Z]]))[0][0]; out['A'] = [float(A[0]), float(A[2]), float(-A[1])]   # 기준점(three 좌표)
