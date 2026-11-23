@@ -1,15 +1,15 @@
 # 얼굴 피부 다듬기: base15_raw.glb(render15.py 결과) → base15.glb
-# 1) 얼굴 앞쪽 삼각형을 잘게 나눈다(새 꼭짓점은 거리장 표면에 붙이고, 뼈 가중치·색은 양 끝의 평균).
-#    줄인 메시(2000면)는 삼각형이 커서 법선 보간 경계가 관자놀이·뺨에 밝은 줄로 보였다.
+# 1) 접힌 삼각형을 편다(아래). 관자놀이·턱 옆 밝은 줄의 원인. 면 수는 그대로
+#    (나눔 단계를 주면 얼굴 앞 삼각형을 1→4로 나눌 수 있지만 기본 0: 접힘을 편 뒤로는 효과 대비 면이 많이 는다)
 # 2) 법선: 얼굴 굴곡(눈자리·눈썹뼈·콧대·미간·볼·입 주변·코)의 세기를 FK배로 줄인 거리장의 기울기.
 #    머리(목 위, 귀 안쪽)는 거리장 법선을 그대로, 그 밖은 원래 메시 법선에 굴곡 차이만큼만 더한다(뒤통수·몸은 그대로).
-#   python3 facenorm.py [FK=0.55] [단계=1]   → 그 뒤 faces15.py를 다시 돌려 얼굴 조각 법선도 맞춘다
+#   python3 facenorm.py [FK=0.55] [나눔 단계=0]   → 그 뒤 faces15.py를 다시 돌려 얼굴 조각 법선도 맞춘다
 import os, sys, json, struct
 import numpy as np
 D0 = os.path.dirname(os.path.abspath(__file__))
 os.environ.setdefault('PARAMS', os.path.join(D0, 'params.json')); sys.path.insert(0, D0)
 import chibi15 as C
-k = float(sys.argv[1]) if len(sys.argv) > 1 else 0.55; LV = int(sys.argv[2]) if len(sys.argv) > 2 else 1
+k = float(sys.argv[1]) if len(sys.argv) > 1 else 0.55; LV = int(sys.argv[2]) if len(sys.argv) > 2 else 0
 b = open(os.path.join(D0, 'base15_raw.glb'), 'rb').read()
 n = struct.unpack('<I', b[12:16])[0]; j = json.loads(b[20:20 + n]); B0 = 20 + n + 8
 pr = j['meshes'][0]['primitives'][0]; A = pr['attributes']
@@ -28,6 +28,25 @@ def surf(p, it=4):
     return np.stack([x, z, -y], 1)
 def inreg(p): return (p[:, 1] > 0.60) & (p[:, 1] < 1.02) & (p[:, 2] > 0.12) & (np.abs(p[:, 0]) < 0.40)   # three: y 위, z 앞
 
+def gN(p, fk):
+    x, y, z = p[:, 0], -p[:, 2], p[:, 1]; C.FK = fk; e = 1e-3
+    g = np.stack([C.sdf(x + e, y, z) - C.sdf(x - e, y, z), C.sdf(x, y + e, z) - C.sdf(x, y - e, z), C.sdf(x, y, z + e) - C.sdf(x, y, z - e)], 1); C.FK = 1.0
+    g /= np.maximum(np.linalg.norm(g, axis=1, keepdims=True), 1e-9); return np.stack([g[:, 0], g[:, 2], -g[:, 1]], 1)
+# 접힌 삼각형 펴기(면 수 그대로): 줄인 메시에서 관자놀이(꼭짓점 217)·턱 옆(95)의 삼각형이 뒤집혀 접혀 있었다.
+# 접힌 삼각형의 꼭짓점을 이웃 평균 자리로 옮기고 거리장 표면에 붙인다. 이것이 관자놀이 밝은 줄·꺾인 음영의 원인
+def folds():
+    fn = np.cross(P[I[:, 1]] - P[I[:, 0]], P[I[:, 2]] - P[I[:, 0]]); fn /= np.linalg.norm(fn, axis=1, keepdims=True) + 1e-12
+    vn = gN(P, 1.0)[I].mean(1); vn /= np.linalg.norm(vn, axis=1, keepdims=True)
+    return np.nonzero(((fn * vn).sum(1) < 0.2) & (P[I].mean(1)[:, 1] > 0.55) & (np.abs(P[I].mean(1)[:, 0]) < 0.40))[0]   # 뒤집힌 것만(귀 이음새의 원래 꺾임은 건드리지 않는다)
+nb = {}
+for t in I:
+    for q in range(3): nb.setdefault(t[q], set()).update((t[(q + 1) % 3], t[(q + 2) % 3]))
+for it in range(20):
+    F_ = folds()
+    if not len(F_): break
+    for v in set(I[F_].ravel()):
+        P[v] = surf(np.array([P[list(nb[v])].mean(0)]))[0]
+print('접힌 삼각형', len(folds()), '(반복', it, ')')
 for _ in range(LV):
     cen = P[I].mean(1); R = inreg(cen); E = {}
     def mid(a, c):
