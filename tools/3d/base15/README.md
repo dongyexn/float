@@ -12,6 +12,7 @@
 | `hair01_lite.json` | 헤어 01 데이터(프로젝트 문서 float-hair 참조) |
 | `faces15.py`, `faces15.json` | 얼굴 생성기와 결과(머리 표면에 투영한 파츠, 꼭짓점 색): 점토 얼굴 20종(A~T, 지금은 안 씀) + 납작하게 찍은 새 얼굴(U = 여자 01, V = 남자 01. 그림 시안의 좌표·색을 옮겨 게임 카메라 방향으로 머리에 투영, 색은 게임 화면 실측으로 보정. 법선 `n`(몸 메시에서 보간)·성별 `sex` 포함) |
 | `facenorm.py`, `base15_raw.glb` | 얼굴 피부 다듬기(`python3 facenorm.py 0.55` → `base15.glb`): render15가 뽑은 `base15_raw.glb`에서 뒤집혀 접힌 삼각형(관자놀이·턱 옆)을 펴고, 머리 법선을 얼굴 굴곡 0.55배 거리장 법선으로 바꾼다. 면 수 그대로(2000). 돌린 뒤 `faces15.py` 다시 실행 |
+| `hairlod.mjs`, `hair0*_lo.json` | 헤어 저폴리(`node hairlod.mjs`, three 0.160 필요): 헤어·캡을 1/5로 줄인 모양. 게임은 줌 14보다 멀면 주민 머리를 이것으로 바꾼다(`play_game.js` HLK). 헤어를 고치면 다시 돌린다 |
 | `laytool.py`, `laytool_src.html` | 얼굴 배치 도구(`python3 laytool.py` → `build/laytool.html`): 눈·입·볼터치의 자리·크기를 슬라이더로 옮겨 보고 값을 복사한다. 확정 값은 `faces15.py`의 `LAY`(또는 얼굴별 `FLAT[..]['lay']`)에 넣고 다시 굽는다 |
 | `mktest.py` | 시험판 빌드 |
 
