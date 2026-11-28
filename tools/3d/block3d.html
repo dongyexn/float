@@ -1044,13 +1044,13 @@ const fountain=(cx_,cz_)=>at(cx_,cz_,-1.65,-2.15,()=>{const cx=-1.65,cz=-2.15,st
   for(let i=0;i<4;i++){const a=i/4*Math.PI*2+Math.PI/4,x=cx+Math.cos(a)*1.1,z=cz+Math.sin(a)*1.1;add(new THREE.CylinderGeometry(.016,.022,.5,8),M('#23262b',{metalness:.3,roughness:.5}),x,B+.28,z);add(new THREE.SphereGeometry(.055,12,10),M('#fff3d6',{emissive:'#ffffff',emissiveIntensity:.4}),x,B+.56,z,false);add(new THREE.CylinderGeometry(.03,.03,.012,10),M('#23262b'),x,B+.51,z,false);
    const b=i/4*Math.PI*2,ux=cx+Math.cos(b)*1.1,uz=cz+Math.sin(b)*1.1;add(new THREE.CylinderGeometry(.1,.06,.12,14),st2,ux,B+.1,uz);add(new THREE.SphereGeometry(.095,12,8),M('#4f9e45',{roughness:.85}),ux,B+.19,uz);for(let k=0;k<5;k++){const t=k/5*Math.PI*2;add(new THREE.SphereGeometry(.026,8,6),M(['#ff8fb1','#ffd23d','#ffffff','#ff6f61','#b48cff'][(k+i)%5]),ux+Math.cos(t)*.065,B+.25,uz+Math.sin(t)*.065,false);}}
  });
-const roofCafe=(x,z)=>at(x,z,-1.35,-.15,()=>{/* rooftop-terrace cafe */{bld(-1.35,-.3,-.15,.8,2,{wall:'#f7f5f1',wood:1,roof:'#b98a5e'});const y=B+.64;for(const [a,b] of [[-1.0,.2],[-.6,.5]]){add(new THREE.CylinderGeometry(.012,.012,.32,6),wm,a,y+.16,b);add(new THREE.ConeGeometry(.2,.09,16),M('#2f8f6b'),a,y+.34,b);}
+const roofCafe=(x,z)=>at(x,z,-1.35,-.15,()=>{/* rooftop-terrace cafe */{bld(-1.35,-.3,-.15,.8,2,{wall:'#f7f5f1',wood:1,roof:'#b98a5e'});const y=B+2*.55;/* 옥상 = 2층 × 층고 */for(const [a,b] of [[-1.0,.2],[-.6,.5]]){add(new THREE.CylinderGeometry(.012,.012,.32,6),wm,a,y+.16,b);add(new THREE.ConeGeometry(.2,.09,16),M('#2f8f6b'),a,y+.34,b);}
   bx(-1.35,-.3,y,y+.12,.77,.8,glz,.005,false);bx(-.33,-.3,y,y+.12,-.15,.8,glz,.005,false);}
  });
 const shopHouse=(x,z)=>at(x,z,3.25,-2.4,()=>{/* shop-house (상가주택) */{bld(3.25,4.4,-2.4,-1.3,3,{wall:'#c98a6a',brick:1,balc:1,ww:.36,roof:'#cfc8bc'});bx(3.25,4.4,B,B+.3,-1.32,-1.26,M('#f3efe8'),.01);bx(3.3,4.35,B+.04,B+.26,-1.27,-1.25,M('#9fd0f5'),.005,false);
-  const aw=add(new THREE.BoxGeometry(1.1,.03,.22),M('#ffc23d'),3.82,B+.33,-1.17);aw.rotation.x=.4;bx(3.4,4.2,B+.96,B+1.06,-2.25,-1.45,M('#6cc552',{roughness:.8}),.04);}
+  const aw=add(new THREE.BoxGeometry(1.1,.03,.22),M('#ffc23d'),3.82,B+.33,-1.17);aw.rotation.x=.4;bx(3.4,4.2,B+1.5,B+1.6,-2.25,-1.45,M('#6cc552',{roughness:.8}),.04);}
  });
-const restaurant=(x,z)=>at(x,z,3.25,-.6,()=>{/* restaurant w/ rooftop billboard */{bld(3.25,4.45,-.6,.7,2,{wall:'#f6f2ea',frame:'#6b5a4c',shop:'#ff7a59',ww:.4,roof:'#d6cfc4',awn:'#ff7a59'});const y=B+.64;
+const restaurant=(x,z)=>at(x,z,3.25,-.6,()=>{/* restaurant w/ rooftop billboard */{bld(3.25,4.45,-.6,.7,2,{wall:'#f6f2ea',frame:'#6b5a4c',shop:'#ff7a59',ww:.4,roof:'#d6cfc4',awn:'#ff7a59'});const y=B+2*.55;
   for(const pz of [-.35,.45])bx(3.8,3.85,y,y+.35,pz,pz+.05,dk,.005);const cv=document.createElement('canvas');cv.width=256;cv.height=64;const g=cv.getContext('2d');g.fillStyle='#ffc23d';g.fillRect(0,0,256,64);g.fillStyle='#ff7a59';g.fillRect(0,46,256,18);g.beginPath();g.arc(40,26,18,0,7);g.fill();g.fillStyle='#3e2a1e';g.fillRect(72,16,150,8);g.fillRect(72,30,110,8);
   const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;const sm=new THREE.MeshStandardMaterial({map:t,roughness:.5});add(new THREE.BoxGeometry(.06,.4,1.1),[sm,sm,dk,dk,dk,dk],3.84,y+.5,.08);}
  });
@@ -1160,12 +1160,13 @@ bx(-.85,.85,.03,.16,cz0-.4,cz0+.4,M('#e9e4da'),.03);bx(-.5,.5,.16,.2,cz0-.25,cz0
   for(let i=0;i<3;i++){bx(-1.7+i*.34,-1.42+i*.34,.1,.34,.9,1.18,M(['#3d7de0','#e0533a','#2fa86a'][i]),.012);for(let k=1;k<4;k++)bx(-1.7+i*.34+k*.07,-1.693+i*.34+k*.07,.1,.34,1.18,1.186,dk,.001,false);}bx(-.5,-.2,.1,.2,.95,1.2,M('#a8774f'),.008);bx(-.48,-.22,.2,.3,.97,1.18,M('#a8774f'),.008);});
  const BIG=[['종합경기장',stadium,5.6,4.2,'fac'],['쇼핑몰',mall,4.2,3.2,'com'],['기차역',station,4.8,3.0,'fac'],['대학교',univ,3.8,3.6,'pub'],['놀이공원',wheel,3.7,3.7,'fac'],['공장',factory,4.4,3.6,'ind']];
  /* 신규 건물(SIAN): 규모에 맞는 칸 수. [이름,함수,가로,세로,분류] — 앞쪽은 +z */
- const SN=SIAN(THREE,RoundedBoxGeometry,null,cur),SNL=Object.assign({},SN.B1,SN.B2,SN.B3,SN.P),snw=(f,s=1)=>(cx,cz)=>{const g=new THREE.Group();g.position.set(cx,.13*(1-s),cz);g.scale.setScalar(s);cur.add(g);SN.setCur(g);f();};
+ const SN=SIAN(THREE,RoundedBoxGeometry,null,cur),SNL=Object.assign({},SN.B1,SN.B2,SN.B3,SN.P),snw=(f,s=1,vy=1)=>(cx,cz)=>{const g=new THREE.Group();g.position.set(cx,.13*(1-s*vy),cz);g.scale.set(s,s*vy,s);cur.add(g);SN.setCur(g);f();};
+ /* 층이 있는 신규 건물은 예전 사람 키(0.49칸)에 맞춰 층고가 낮았다 — 주민 0.40칸·층고 0.5칸에 맞게 세로만 키운다(이미 높은 타워·탑·탱크·광장·전통 지붕은 그대로) */const VSY={};for(const f of 'peanut cornerShop container country cityHome penthouse terraceApt cafe ramen icecream stationery optician petshop karaoke hypermarket dept broadcast cowork datacenter hotel bankHQ lab convention kinder policeBox fireStation lectureHall natatorium villageMart farmSupply busTerminal'.split(' '))VSY[f]=1.4;for(const f of 'printShop coldStore brewery recycle sawmill truckDepot dairy bakery foundry paperMill flourMill carPlant fab'.split(' '))VSY[f]=1.25;
  /* 사람에 비해 작던 시골 집·사일로는 2×2 자리에 크게 */const BIGSC={hanok:1.95,chapel:1.9,villageHall:1.45,farmhouse:1.95,slateHouse:1.95,yangok:1.95,yangokBlue:1.95,silo:2.4,sanshin:1,danggan:1,buddha:1};
  for(const [c,L] of Object.entries(SNCAT))
-  for(const it of L.split('|')){const [f,n,w,d]=it.split(' ');BIG.push([n.replace('119안전센터','119 안전센터'),snw(SNL[f],BIGSC[f]||(+w*+d===1?1.25:1)),+w,+d,c,f]);}
+  for(const it of L.split('|')){const [f,n,w,d]=it.split(' ');BIG.push([n.replace('119안전센터','119 안전센터'),snw(SNL[f],BIGSC[f]||(+w*+d===1?1.25:1),VSY[f]||1),+w,+d,c,f]);}
  const PN=[['자판기','vending'],['우체통','postbox'],['소화전','hydrant'],['공중전화','phone'],['자전거','bikes'],['파라솔','parasol'],['그네','swing'],['미끄럼틀','slide'],['시소','seesaw'],['정자','pavilion'],['장독대','jars'],['허수아비','scarecrow'],['캠핑 세트','camp'],['돌담','stoneWall'],['나무 울타리','woodFence'],['장승','jangseung'],['동상','statue'],['시계탑','clockPost'],['소형 분수','miniFountain'],['성탄 트리','xmasTree'],['정원 연못','gardenPond'],['짚뭉치','hay'],['경운기','tiller'],['원두막','hut'],['버스정류장','busStop']];
- const PROP=(k,x,z,a=0)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=a;g.userData.pxz=[x,z];(window.__PROPM||(window.__PROPM=[])).push(g);/* 버스정류장은 주민이 앉을 만큼 키운다(바닥 높이는 그대로) */if(PN[k][1]==='busStop'){g.scale.setScalar(1.85);g.position.y=-.13*.85;}cur.add(g);SN.setCur(g);SNL[PN[k][1]]();};
+ const PROP=(k,x,z,a=0)=>{const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=a;g.userData.pxz=[x,z];(window.__PROPM||(window.__PROPM=[])).push(g);/* 버스정류장은 주민이 앉을 만큼 키운다(바닥 높이는 그대로) */if(PN[k][1]==='busStop'){g.scale.setScalar(1.55);g.position.y=-.13*.55;}cur.add(g);SN.setCur(g);SNL[PN[k][1]]();};
 const rotd=(cx,cz,dir,fn)=>{const g=new THREE.Group();g.position.set(cx,0,cz);g.rotation.y={'z+':0,'x+':Math.PI/2,'z-':Math.PI,'x-':-Math.PI/2}[dir];const pc=cur;pc.add(g);cur=g;fn();cur=pc;};
 /* clay person (~2 heads tall): matte hand-modelled look — every part is slightly lumpy. forward is +x. pose {rot,swing,sit,wave}; limbs hang from pivots so they can be animated */
 const CLAY=new Map(),clay=c=>{let m=CLAY.get(c);if(!m){const sc_=new THREE.Color(c).lerp(new THREE.Color('#ffffff'),.55);CLAY.set(c,m=new THREE.MeshPhysicalMaterial({color:c,roughness:.9,metalness:0,envMapIntensity:.1,sheen:.35,sheenRoughness:.5,sheenColor:sc_}));}return m;};
@@ -1300,9 +1301,9 @@ const X=(b,o)=>Object.assign({},b,o),CAT={
   ['주민센터',2,X(WOOD,{flag:1})],['법원',4,X(STONE,{wall:'#ece6da',ww:.24,pitch:'#8a8f98'})],['발전소',2,{wall:'#bfc5cc',frame:'#3e434c',ww:.4,roof:'#aab1ba',stack:2,noroof:1}],
   ['변전소',1,{wall:'#8f97a3',frame:'#ffc23d',ww:.5,roof:'#7a828e',solar:1,noroof:1}],['정수장',2,{wall:'#dcecf7',frame:'#3d7de0',ww:.4,roof:'#c4d8e8',tank:1}],
   ['버스터미널',1,{wall:'#f4f5f7',shop:'#3d7de0',awn:'#3e434c',roof:'#dfe3ea',rsign:'#3d7de0',noroof:1}],['체육관',2,{wall:'#eef2f6',frame:'#3d7de0',ww:.44,pitch:'#3d7de0'}]]};
-/* 10층 이상 오피스 타워는 2×2 (1칸에 세우면 너무 가늘다) */
-CAT.off.forEach((e,k)=>{if(e[1]>=10)BIG.push([e[0],(cx,cz)=>bld(cx-.84,cx+.84,cz-.84,cz+.84,e[1],e[2]),2,2,'off','tw'+k]);});
-for(const it of (SNCAT2+'|'+SNCAT3).split('|')){const [f,n,w,d,c]=it.split(' ');BIG.push([n,snw(SNL[f],BIGSC[f]||(+w*+d===1?1.25:1)),+w,+d,c,f]);}
+/* 10층 이상 오피스 타워는 3×3 (층고 0.5칸이면 2×2에선 연필처럼 가늘다) */
+CAT.off.forEach((e,k)=>{if(e[1]>=10)BIG.push([e[0],(cx,cz)=>bld(cx-1.34,cx+1.34,cz-1.34,cz+1.34,e[1],e[2]),3,3,'off','tw'+k]);});
+for(const it of (SNCAT2+'|'+SNCAT3).split('|')){const [f,n,w,d,c]=it.split(' ');BIG.push([n,snw(SNL[f],BIGSC[f]||(+w*+d===1?1.25:1),VSY[f]||1),+w,+d,c,f]);}
 const API={heroine,person,JET,CAT,BIG,PROP,PN,rotd,lift,bld,house,car,gas,towerA,roundB,fountain,roofCafe,shopHouse,restaurant,greenhouse,STY:{APT,OFF,SHOP,VIL,CVS,STONE,BAND,BRICK,GBRICK,WOOD,TOWN,NEIGH,BAKE,PHAR},crown,PAL,TRK,PIT,LEAF,FH};
 /* play build: calls are recorded per lift() and only executed for placements not already cached */
 if(window.OBC){const C=window.OBC;let rec={h:0,calls:[]},exec=false;const wrap=(n,f)=>(...a)=>{if(exec)return f(...a);rec.calls.push([n,f,a]);};
@@ -1836,7 +1837,7 @@ if(DS.length)sc.add(new THREE.Mesh(mergeGeometries(DS),paint));
  for(const [a,cells] of grp){let x0=1e9,x1=-1,y0=1e9,y1=-1;for(const i of cells){const x=i%N,y=(i/N)|0;x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);done[i]=1;}
   const w=x1-x0+1,k=kind[a],r=hs(a);nb++;O.lift(hT(x0,y0));
   if(k===K.COM){ if(r<.55){const sd=[['z+',0,1],['x+',1,0],['z-',0,-1],['x-',-1,0]].map(([n,dx,dy])=>{let c=0;if(dx)for(let yy=y0;yy<=y1;yy++){const xx=dx>0?x1+1:x0-1;if(isR(xx,yy)&&land(xx,yy))c++;}else for(let xx=x0;xx<=x1;xx++){const yy=dy>0?y1+1:y0-1;if(isR(xx,yy)&&land(xx,yy))c++;}return [n,c,dx,dy];}).sort((a,b)=>b[1]-a[1])[0],dg=sd[1]?sd[0]:'z+',sw=dg[0]==='x',hw=(x1-x0+.7)/2,hd=(y1-y0+.7)/2;
-    O.rotd((x0+x1+1)/2,(y0+y1+1)/2,dg,()=>O.bld(-(sw?hd:hw),sw?hd:hw,-(sw?hw:hd),sw?hw:hd,10+((r*100)|0)%5,r<.3?S.APT:Object.assign({},S.APT,{crown:2})));
+    O.rotd((x0+x1+1)/2,(y0+y1+1)/2,dg,()=>O.bld(-(sw?hd:hw),sw?hd:hw,-(sw?hw:hd),sw?hw:hd,7+((r*100)|0)%4,r<.3?S.APT:Object.assign({},S.APT,{crown:2})));/* 층고가 0.5칸이 되어 7~10층(예전 10~14층과 비슷한 높이) */
     if(dg==='z+'||dg==='z-')for(let xx=x0;xx<=x1;xx++){const j=(dg==='z+'?y1+1:y0-1)*N+xx;if(!done[j])done[j]=2;}else for(let yy=y0;yy<=y1;yy++){const j=yy*N+(dg==='x+'?x1+1:x0-1);if(!done[j])done[j]=2;}} else if(r<.8)O.towerA(x0+.4,y0+.4); else O.roundB(x0+.45,y0+.4);}
   else if(w>=4){FA.add(a);FNT.push([x0,y0,w]);O.fountain(x0+w/2,y0+w/2);}
   else{const f=[O.gas,O.restaurant][((r*2)|0)%2];f(x0+.35,y0+.35);}}
